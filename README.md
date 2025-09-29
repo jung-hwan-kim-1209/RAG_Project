@@ -281,12 +281,6 @@ class CustomRiskEvaluator(BaseRiskEvaluator):
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 📞 지원
-
-- 이슈 제기: [GitHub Issues](https://github.com/your-repo/issues)
-- 이메일: support@your-domain.com
-- 문서: [Wiki](https://github.com/your-repo/wiki)
-
 ## 🙏 감사의 말
 
 - OpenAI GPT 모델
