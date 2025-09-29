@@ -1,0 +1,135 @@
+각 파일별 역할 분석
+
+  1. cli.py (CLI 인터페이스)
+
+  - 역할: 사용자가 시스템과 상호작용하는 명령줄 인터페이스
+  - 주요 명령어:
+    - evaluate: 스타트업 투자 가치 평가
+    - setup: 초기 설정 및 데이터베이스 구축
+    - add-documents: 벡터DB에 문서 추가
+    - search: 회사 관련 문서 검색
+    - status: 시스템 상태 확인
+    - config: 현재 설정 확인
+    - demo: 데모 실행
+
+  2. config.py (설정 관리)
+
+  - 역할: 시스템 전반의 설정값 관리
+  - 주요 설정:
+    - ModelConfig: OpenAI GPT-4, temperature=0.2
+    - VectorDBConfig: ChromaDB + FAISS, 임베딩 모델
+    - AnalysisWeights: 각 분석 영역별 가중치 (성장성 20%, 비즈니스모델 15% 등)
+    - ScoringConfig: S~D 등급 기준, 유니콘 확률 계산 가중치
+
+  3. models.py (데이터 모델)
+
+  - 역할: 시스템에서 사용하는 모든 데이터 구조 정의
+  - 주요 모델:
+    - CompanyInfo: 회사 기본 정보
+    - AnalysisResult: 개별 분석 결과 (점수, 등급, 강점/약점)
+    - RiskAssessment: 리스크 평가
+    - UnicornScore: 유니콘 점수
+    - InvestmentReport: 최종 투자 리포트
+    - PipelineContext: 파이프라인 실행 컨텍스트
+
+  4. pipeline.py (메인 파이프라인)
+
+  - 역할: 10개 레이어를 순차적으로 실행하는 핵심 파이프라인
+  - 10개 레이어 구조:
+    a. INPUT_LAYER: 입력 파싱
+    b. KNOWLEDGE_BASE_LAYER: 지식베이스 연결
+    c. DOCUMENT_RETRIEVAL_LAYER: 문서 검색
+    d. EXTERNAL_SEARCH_LAYER: 외부 검색
+    e. ANALYSIS_ENGINE: 투자 분석
+    f. SCORING_RANKING_ENGINE: 점수 계산
+    g. RISK_ASSESSMENT_LAYER: 리스크 평가
+    h. REPORT_GENERATION_LAYER: 리포트 생성
+    i. QUALITY_CHECK_LAYER: 품질 검증
+    j. OUTPUT_LAYER: 결과 출력
+
+  5. layers/ 디렉토리 (각 처리 레이어)
+
+  총 10개의 개별 레이어 파일들이 각각의 특수한 기능을 담당합니다.
+
+  ⚙️ 설정해야 할 것들
+
+  1. 필수 환경 설정
+
+  # 1. .env 파일 생성
+  cp .env.example .env
+
+  # 2. OpenAI API 키 설정 (필수!)
+  # .env 파일에서 다음을 수정:
+  OPENAI_API_KEY=your_actual_openai_api_key_here
+
+  2. Python 환경 설정
+
+  # 1. 가상환경 생성 (이미 venv 폴더가 있음)
+  # 2. 의존성 설치
+  pip install -r requirements.txt
+
+  3. 시스템 초기화
+
+  # 데이터베이스와 디렉토리 구조 생성
+  python cli.py setup
+
+  4. 문서 데이터 준비
+
+  다음 디렉토리에 분석용 문서들을 추가:
+  - ./data/documents/ir_reports/ - IR 보고서
+  - ./data/documents/market_reports/ - 시장 분석 보고서
+  - ./data/documents/company_profiles/ - 회사 프로필
+  - ./data/documents/financials/ - 재무제표
+
+  5. 벡터 데이터베이스 설정
+
+  # 문서를 벡터DB에 추가
+  python cli.py add-documents ./data/documents/
+
+  🚀 사용 방법
+
+  기본 사용법
+
+  # 투자 평가 실행
+  python cli.py evaluate "토스의 투자 가치를 평가해줘"
+
+  # JSON 형식으로 저장
+  python cli.py evaluate "카카오 성장성 분석" --format json --save --output report.json
+
+  # 외부 검색 없이 빠른 평가
+  python cli.py quick "배달의민족 리스크 분석"
+
+  시스템 관리
+
+  # 시스템 상태 확인
+  python cli.py status
+
+  # 현재 설정 확인
+  python cli.py config
+
+  # 데모 실행
+  python cli.py demo
+
+  🔧 핵심 기술 스택
+
+  - LLM: OpenAI GPT-4
+  - 벡터 DB: ChromaDB + FAISS
+  - 임베딩: sentence-transformers
+  - 문서 처리: LangChain, PyPDF
+  - CLI: Click
+  - 기타: pandas, scikit-learn, requests
+
+  📋 분석 영역
+
+  시스템이 평가하는 7개 핵심 영역:
+  1. 성장성 분석 (20% 가중치)
+  2. 비즈니스 모델 분석 (15%)
+  3. 기술/보안 분석 (15%)
+  4. 재무 건전성 분석 (15%)
+  5. 팀 역량 평가 (15%)
+  6. 규제 적합성 분석 (10%)
+  7. 제휴/네트워크 분석 (10%)
+
+  최종 결과는 S~D 등급과 유니콘 확률로 제시됩니다.
+
+  이 시스템을 사용하려면 먼저 OpenAI API 키 설정이 가장 중요하고, 그 다음 초기 설정과 문서 데이터 준비가 필요합니다.
