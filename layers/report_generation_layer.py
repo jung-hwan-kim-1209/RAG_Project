@@ -131,6 +131,13 @@ Executive Summary는 다음 구조로 작성해주세요:
                 unicorn_probability=unicorn_score.unicorn_probability,
                 recommendation=recommendation.value
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 REPORT_GENERATION_LAYER (EXECUTIVE_SUMMARY) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             return response.content.strip()
         except Exception as e:
             return f"Executive Summary 생성 오류: {str(e)}"
@@ -167,6 +174,13 @@ Executive Summary는 다음 구조로 작성해주세요:
                 analysis_results="\n".join(analysis_text),
                 risk_assessments="\n".join(risk_text)
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 REPORT_GENERATION_LAYER (DETAILED_ANALYSIS) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             return response.content.strip()
         except Exception as e:
             return f"상세 분석 생성 오류: {str(e)}"
@@ -188,6 +202,13 @@ Executive Summary는 다음 구조로 작성해주세요:
                 unicorn_score=f"{unicorn_score.total_score:.1f}점 ({unicorn_score.grade}급)",
                 key_factors=key_factors_text
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 REPORT_GENERATION_LAYER (INVESTMENT_RATIONALE) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             return response.content.strip()
         except Exception as e:
             return f"투자 근거 생성 오류: {str(e)}"

@@ -75,6 +75,12 @@ JSON 형식으로 응답해주세요:
                 report_content=report_summary
             ))
 
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 QUALITY_CHECK_LAYER - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             import json
             result_data = json.loads(response.content.strip())
             return result_data.get("relevance_score", 5.0) / 10.0
@@ -247,6 +253,12 @@ JSON 형식으로 응답해주세요:
             response = self.llm.invoke(self.objectivity_prompt.format(
                 report_content=report_content
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 QUALITY_CHECK_LAYER (OBJECTIVITY) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
 
             import json
             objectivity_data = json.loads(response.content.strip())
