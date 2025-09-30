@@ -29,13 +29,10 @@ class VectorDBConfig:
 @dataclass
 class AnalysisWeights:
     """Scoring weights for different analysis areas"""
-    growth_weight: float = float(os.getenv("GROWTH_WEIGHT", "0.20"))
-    business_model_weight: float = float(os.getenv("BUSINESS_MODEL_WEIGHT", "0.15"))
-    tech_security_weight: float = float(os.getenv("TECH_SECURITY_WEIGHT", "0.15"))
-    financial_health_weight: float = float(os.getenv("FINANCIAL_HEALTH_WEIGHT", "0.15"))
-    team_weight: float = float(os.getenv("TEAM_WEIGHT", "0.15"))
-    regulatory_weight: float = float(os.getenv("REGULATORY_WEIGHT", "0.10"))
-    partnership_weight: float = float(os.getenv("PARTNERSHIP_WEIGHT", "0.10"))
+    growth_weight: float = float(os.getenv("GROWTH_WEIGHT", "0.30"))
+    business_model_weight: float = float(os.getenv("BUSINESS_MODEL_WEIGHT", "0.25"))
+    tech_security_weight: float = float(os.getenv("TECH_SECURITY_WEIGHT", "0.25"))
+    financial_health_weight: float = float(os.getenv("FINANCIAL_HEALTH_WEIGHT", "0.20"))
 
 @dataclass
 class ScoringConfig:
@@ -56,12 +53,10 @@ class ScoringConfig:
 
         if self.unicorn_probability_weights is None:
             self.unicorn_probability_weights = {
-                "market_size": float(os.getenv("MARKET_SIZE_WEIGHT", "0.25")),
-                "growth_rate": float(os.getenv("GROWTH_RATE_WEIGHT", "0.20")),
-                "technology": float(os.getenv("TECHNOLOGY_WEIGHT", "0.15")),
-                "team": float(os.getenv("TEAM_WEIGHT_PROBABILITY", "0.15")),
-                "business_model": float(os.getenv("BUSINESS_MODEL_WEIGHT_PROBABILITY", "0.15")),
-                "funding": float(os.getenv("FUNDING_WEIGHT", "0.10"))
+                "market_size": float(os.getenv("MARKET_SIZE_WEIGHT", "0.30")),
+                "growth_rate": float(os.getenv("GROWTH_RATE_WEIGHT", "0.25")),
+                "technology": float(os.getenv("TECHNOLOGY_WEIGHT", "0.25")),
+                "business_model": float(os.getenv("BUSINESS_MODEL_WEIGHT_PROBABILITY", "0.20"))
             }
 
 @dataclass

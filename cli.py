@@ -239,15 +239,12 @@ def config():
     click.echo(f"임베딩 모델: {config_data['vector_db'].embedding_model}")
     click.echo(f"Top-K 결과: {config_data['vector_db'].top_k_results}")
 
-    click.echo("\n[설정] 분석 가중치:")
+    click.echo("\n[설정] 분석 가중치 (4개 분석기):")
     weights = config_data['analysis_weights']
     click.echo(f"  성장성: {weights.growth_weight:.0%}")
     click.echo(f"  비즈니스모델: {weights.business_model_weight:.0%}")
     click.echo(f"  기술/보안: {weights.tech_security_weight:.0%}")
     click.echo(f"  재무건전성: {weights.financial_health_weight:.0%}")
-    click.echo(f"  팀역량: {weights.team_weight:.0%}")
-    click.echo(f"  규제적합성: {weights.regulatory_weight:.0%}")
-    click.echo(f"  제휴/네트워크: {weights.partnership_weight:.0%}")
 
 @cli.command()
 def demo():

@@ -405,251 +405,8 @@ JSON 형식으로 응답해주세요:
                 supporting_evidence=[]
             )
 
-class TeamEvaluator(BaseAnalyzer):
-    """팀 역량 평가기"""
 
-    def __init__(self):
-        super().__init__("team_evaluation")
-        self.analysis_prompt = PromptTemplate(
-            input_variables=["company_name", "company_info", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 창업자 및 팀 역량을 평가해주세요.
 
-회사 정보:
-{company_info}
-
-관련 자료:
-{context}
-
-다음 항목들을 중점적으로 분석하고 0-100점으로 점수를 매겨주세요:
-1. 창업자의 업계 경험 및 전문성
-2. 팀 구성의 균형성과 완성도
-3. 과거 성과 및 실행력
-4. 리더십 및 비전
-5. 핵심 인재 확보 능력
-
-JSON 형식으로 응답해주세요:
-{{
-    "score": 75,
-    "summary": "팀 역량 요약",
-    "detailed_analysis": "상세 분석 내용",
-    "key_strengths": ["강점1", "강점2"],
-    "key_weaknesses": ["약점1", "약점2"],
-    "supporting_evidence": ["근거1", "근거2"]
-}}"""
-        )
-
-    def analyze(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
-    ) -> AnalysisResult:
-        """팀 역량 평가 실행"""
-        context = self._create_context_summary(documents, external_results)
-        company_info_text = f"업종: {company_info.industry}, 직원수: {company_info.employee_count}"
-
-        try:
-            response = self.llm.invoke(self.analysis_prompt.format(
-                company_name=company_info.name,
-                company_info=company_info_text,
-                context=context
-            ))
-
-            # GPT 응답을 터미널에 출력
-            print(f"\n🔍 {self.analyzer_name.upper()} - GPT 응답:")
-            print("=" * 60)
-            print(response.content)
-            print("=" * 60)
-
-            import json
-            result_data = json.loads(response.content.strip())
-
-            return AnalysisResult(
-                category=self.analyzer_name,
-                score=result_data.get("score", 50.0),
-                grade=self._calculate_grade(result_data.get("score", 50.0)),
-                summary=result_data.get("summary", ""),
-                detailed_analysis=result_data.get("detailed_analysis", ""),
-                key_strengths=result_data.get("key_strengths", []),
-                key_weaknesses=result_data.get("key_weaknesses", []),
-                supporting_evidence=result_data.get("supporting_evidence", [])
-            )
-
-        except Exception as e:
-            return AnalysisResult(
-                category=self.analyzer_name,
-                score=50.0,
-                grade="C",
-                summary="팀 역량 평가 오류",
-                detailed_analysis=f"분석 중 오류 발생: {str(e)}",
-                key_strengths=[],
-                key_weaknesses=[],
-                supporting_evidence=[]
-            )
-
-class RegulatoryAnalyzer(BaseAnalyzer):
-    """규제 적합성 분석기"""
-
-    def __init__(self):
-        super().__init__("regulatory_analysis")
-        self.analysis_prompt = PromptTemplate(
-            input_variables=["company_name", "company_info", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 규제 적합성을 분석해주세요.
-
-회사 정보:
-{company_info}
-
-관련 자료:
-{context}
-
-다음 항목들을 중점적으로 분석하고 0-100점으로 점수를 매겨주세요:
-1. 현재 규제 요구사항 준수 현황
-2. 미래 규제 변화에 대한 대응력
-3. 라이선스 및 인허가 확보 상태
-4. 컴플라이언스 체계
-5. 규제 리스크 노출도
-
-JSON 형식으로 응답해주세요:
-{{
-    "score": 65,
-    "summary": "규제 적합성 요약",
-    "detailed_analysis": "상세 분석 내용",
-    "key_strengths": ["강점1", "강점2"],
-    "key_weaknesses": ["약점1", "약점2"],
-    "supporting_evidence": ["근거1", "근거2"]
-}}"""
-        )
-
-    def analyze(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
-    ) -> AnalysisResult:
-        """규제 적합성 분석 실행"""
-        context = self._create_context_summary(documents, external_results)
-        company_info_text = f"업종: {company_info.industry}, 본사: {company_info.headquarters}"
-
-        try:
-            response = self.llm.invoke(self.analysis_prompt.format(
-                company_name=company_info.name,
-                company_info=company_info_text,
-                context=context
-            ))
-
-            # GPT 응답을 터미널에 출력
-            print(f"\n🔍 {self.analyzer_name.upper()} - GPT 응답:")
-            print("=" * 60)
-            print(response.content)
-            print("=" * 60)
-
-            import json
-            result_data = json.loads(response.content.strip())
-
-            return AnalysisResult(
-                category=self.analyzer_name,
-                score=result_data.get("score", 50.0),
-                grade=self._calculate_grade(result_data.get("score", 50.0)),
-                summary=result_data.get("summary", ""),
-                detailed_analysis=result_data.get("detailed_analysis", ""),
-                key_strengths=result_data.get("key_strengths", []),
-                key_weaknesses=result_data.get("key_weaknesses", []),
-                supporting_evidence=result_data.get("supporting_evidence", [])
-            )
-
-        except Exception as e:
-            return AnalysisResult(
-                category=self.analyzer_name,
-                score=50.0,
-                grade="C",
-                summary="규제 적합성 분석 오류",
-                detailed_analysis=f"분석 중 오류 발생: {str(e)}",
-                key_strengths=[],
-                key_weaknesses=[],
-                supporting_evidence=[]
-            )
-
-class PartnershipAnalyzer(BaseAnalyzer):
-    """제휴/네트워크 분석기"""
-
-    def __init__(self):
-        super().__init__("partnership_analysis")
-        self.analysis_prompt = PromptTemplate(
-            input_variables=["company_name", "company_info", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 제휴 및 네트워크를 분석해주세요.
-
-회사 정보:
-{company_info}
-
-관련 자료:
-{context}
-
-다음 항목들을 중점적으로 분석하고 0-100점으로 점수를 매겨주세요:
-1. 전략적 파트너십 구축 현황
-2. 업계 네트워크 및 관계
-3. 고객사와의 관계 강도
-4. 공급업체 및 유통 네트워크
-5. 생태계 내 포지셔닝
-
-JSON 형식으로 응답해주세요:
-{{
-    "score": 70,
-    "summary": "제휴/네트워크 요약",
-    "detailed_analysis": "상세 분석 내용",
-    "key_strengths": ["강점1", "강점2"],
-    "key_weaknesses": ["약점1", "약점2"],
-    "supporting_evidence": ["근거1", "근거2"]
-}}"""
-        )
-
-    def analyze(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
-    ) -> AnalysisResult:
-        """제휴/네트워크 분석 실행"""
-        context = self._create_context_summary(documents, external_results)
-        company_info_text = f"업종: {company_info.industry}, 설명: {company_info.description}"
-
-        try:
-            response = self.llm.invoke(self.analysis_prompt.format(
-                company_name=company_info.name,
-                company_info=company_info_text,
-                context=context
-            ))
-
-            # GPT 응답을 터미널에 출력
-            print(f"\n🔍 {self.analyzer_name.upper()} - GPT 응답:")
-            print("=" * 60)
-            print(response.content)
-            print("=" * 60)
-
-            import json
-            result_data = json.loads(response.content.strip())
-
-            return AnalysisResult(
-                category=self.analyzer_name,
-                score=result_data.get("score", 50.0),
-                grade=self._calculate_grade(result_data.get("score", 50.0)),
-                summary=result_data.get("summary", ""),
-                detailed_analysis=result_data.get("detailed_analysis", ""),
-                key_strengths=result_data.get("key_strengths", []),
-                key_weaknesses=result_data.get("key_weaknesses", []),
-                supporting_evidence=result_data.get("supporting_evidence", [])
-            )
-
-        except Exception as e:
-            return AnalysisResult(
-                category=self.analyzer_name,
-                score=50.0,
-                grade="C",
-                summary="제휴/네트워크 분석 오류",
-                detailed_analysis=f"분석 중 오류 발생: {str(e)}",
-                key_strengths=[],
-                key_weaknesses=[],
-                supporting_evidence=[]
-            )
 
 class AnalysisEngine:
     """분석 엔진 메인 클래스"""
@@ -659,10 +416,7 @@ class AnalysisEngine:
             "growth_analysis": GrowthAnalyzer(),
             "business_model_analysis": BusinessModelAnalyzer(),
             "tech_security_analysis": TechSecurityAnalyzer(),
-            "financial_health_analysis": FinancialHealthAnalyzer(),
-            "team_evaluation": TeamEvaluator(),
-            "regulatory_analysis": RegulatoryAnalyzer(),
-            "partnership_analysis": PartnershipAnalyzer()
+            "financial_health_analysis": FinancialHealthAnalyzer()
         }
 
     def run_parallel_analysis(
@@ -734,8 +488,8 @@ def process_analysis_engine(context: PipelineContext) -> PipelineContext:
         analysis_mapping = {
             "성장성 분석": ["growth_analysis", "business_model_analysis"],
             "재무 분석": ["financial_health_analysis", "growth_analysis"],
-            "기술 분석": ["tech_security_analysis", "team_evaluation"],
-            "리스크 분석": ["regulatory_analysis", "financial_health_analysis"]
+            "기술 분석": ["tech_security_analysis", "business_model_analysis"],
+            "리스크 분석": ["financial_health_analysis", "tech_security_analysis"]
         }
         selected_analyses = analysis_mapping.get(evaluation_type.value, ["growth_analysis"])
 
@@ -751,7 +505,7 @@ def process_analysis_engine(context: PipelineContext) -> PipelineContext:
 
     # 처리 단계 기록
     context.processing_steps.append(
-        f"ANALYSIS_ENGINE: {len(analysis_results)}개 분석 완료 (병렬 실행)"
+        f"ANALYSIS_ENGINE: {len(analysis_results)}개 분석 완료 (병렬 실행) - 4개 분석기 사용"
     )
 
     return context
