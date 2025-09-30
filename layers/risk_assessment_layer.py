@@ -1,537 +1,272 @@
+"""Layer 7: RISK ASSESSMENT LAYER
+각 리스크 유형에 대한 평가를 수행한다.
+프롬프트와 파싱 로직을 정리해 향후 그래프 노드 전환 시 재사용을 용이하게 한다.
 """
-Layer 7: RISK ASSESSMENT LAYER
-risk_evaluator를 실행하여 시장, 규제, 경쟁, 재무 리스크를 평가하는 레이어
-"""
-from typing import List, Dict, Any, Optional
+
+import json
 from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List
+
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 
-from models import (
-    RiskAssessment, RiskLevel, DocumentChunk, ExternalSearchResult,
-    PipelineContext, CompanyInfo, AnalysisResult
-)
 from config import get_config
+from models import (
+    AnalysisResult,
+    CompanyInfo,
+    DocumentChunk,
+    ExternalSearchResult,
+    PipelineContext,
+    RiskAssessment,
+    RiskLevel,
+)
+
+# 리스크 유형별 정의 (프롬프트 요소 및 기본값)
+RISK_DEFINITIONS: Dict[str, Dict[str, object]] = {
+    "market_risk": {
+        "title": "시장",
+        "factors": [
+            "시장 포화도 및 성장 한계",
+            "경기 변동 민감도",
+            "소비자 선호도 변화",
+            "신기술 등장 영향",
+            "글로벌 시장 진입 장벽",
+        ],
+        "defaults": {"impact_score": 7.0, "probability": 0.5},
+    },
+    "regulatory_risk": {
+        "title": "규제",
+        "factors": [
+            "현재 규제 위반 가능성",
+            "향후 규제 강화 리스크",
+            "국가별 규제 차이",
+            "데이터/개인정보 보호 요구",
+            "업종 특화 규제 준수 비용",
+        ],
+        "defaults": {"impact_score": 6.0, "probability": 0.4},
+    },
+    "competitive_risk": {
+        "title": "경쟁",
+        "factors": [
+            "기존 대기업의 시장 재진입",
+            "신규 경쟁자 등장",
+            "대체재 등장",
+            "가격 경쟁 심화",
+            "핵심 인재 유출",
+        ],
+        "defaults": {"impact_score": 7.5, "probability": 0.6},
+    },
+    "financial_risk": {
+        "title": "재무",
+        "factors": [
+            "현금 소진 속도와 자금 여력",
+            "추가 투자 유치 실패 가능성",
+            "수익성 개선 지연",
+            "고정비 증가",
+            "금리·환율 변동 노출",
+        ],
+        "defaults": {"impact_score": 6.5, "probability": 0.5},
+    },
+    "technology_risk": {
+        "title": "기술",
+        "factors": [
+            "핵심 기술 노후화",
+            "보안 취약점 및 사이버 공격",
+            "기술 인재 이탈",
+            "외부 플랫폼 의존성",
+            "확장 시 기술 병목",
+        ],
+        "defaults": {"impact_score": 6.0, "probability": 0.4},
+    },
+    "team_risk": {
+        "title": "팀",
+        "factors": [
+            "창업자·핵심 인재 이탈",
+            "조직 문화 및 커뮤니케이션",
+            "핵심 직군 확보 어려움",
+            "의사결정 구조 미비",
+            "조직 확장 대응 능력",
+        ],
+        "defaults": {"impact_score": 6.5, "probability": 0.3},
+    },
+}
+
 
 class BaseRiskEvaluator:
     """리스크 평가기 기본 클래스"""
 
-    def __init__(self, risk_category: str):
+    def __init__(self, risk_category: str, definition: Dict[str, object]):
         self.risk_category = risk_category
+        self.definition = definition
         self.config = get_config()
         self.llm = OpenAI(
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model_name="gpt-3.5-turbo-instruct",
         )
+        self.evaluation_prompt = self._build_prompt()
 
     def evaluate(
         self,
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
+        analysis_results: List[AnalysisResult],
     ) -> RiskAssessment:
-        """리스크 평가 실행 (하위 클래스에서 구현)"""
         raise NotImplementedError
 
-    def _calculate_risk_level(self, impact_score: float, probability: float) -> RiskLevel:
-        """리스크 레벨 계산"""
-        risk_score = impact_score * probability
+    def _build_prompt(self) -> PromptTemplate:
+        title = self.definition.get("title", "해당")
+        factors = self.definition.get("factors", [])
+        defaults = self.definition.get("defaults", {})
+        impact_default = defaults.get("impact_score", 5.0)
+        probability_default = defaults.get("probability", 0.5)
 
-        if risk_score >= 8.0:
-            return RiskLevel.CRITICAL
-        elif risk_score >= 6.0:
-            return RiskLevel.HIGH
-        elif risk_score >= 4.0:
-            return RiskLevel.MEDIUM
-        else:
-            return RiskLevel.LOW
+        factors_text = "\n".join(
+            f"{index}. {factor}" for index, factor in enumerate(factors, start=1)
+        ) or "- 참고 요소 없음"
+
+        template = f"""다음 정보를 바탕으로 {{company_name}}의 {title} 리스크를 평가해주세요.
+
+회사명: {{company_name}}
+업종: {{industry}}
+
+관련 정보 요약:
+{{context}}
+
+아래 항목을 참고하여 정량·정성 평가를 수행하세요:
+{factors_text}
+
+반드시 JSON 형식으로 응답하세요.
+{{
+    "impact_score": {impact_default},
+    "probability": {probability_default},
+    "description": "위험 설명 (2-3문장)",
+    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
+}}"""
+
+        return PromptTemplate(
+            input_variables=["company_name", "industry", "context"],
+            template=template,
+        )
 
     def _create_analysis_context(
         self,
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
+        analysis_results: List[AnalysisResult],
     ) -> str:
-        """분석 컨텍스트 생성"""
-        context_parts = []
+        context_parts: List[str] = []
 
-        # 관련 문서 정보
         if documents:
             doc_summaries = []
             for doc in documents[:3]:
                 doc_summaries.append(f"- {doc.content[:150]}...")
             context_parts.append("관련 문서:\n" + "\n".join(doc_summaries))
 
-        # 외부 검색 결과
         if external_results:
             external_summaries = []
             for result in external_results[:2]:
                 external_summaries.append(f"- {result.title}: {result.content[:100]}...")
-            context_parts.append("최신 정보:\n" + "\n".join(external_summaries))
+            context_parts.append("최신 외부 정보:\n" + "\n".join(external_summaries))
 
-        # 분석 결과 요약
         if analysis_results:
             analysis_summaries = []
             for result in analysis_results:
-                analysis_summaries.append(f"- {result.category}: {result.score}점 ({result.grade})")
+                analysis_summaries.append(
+                    f"- {result.category}: {result.score}점 ({result.grade})"
+                )
             context_parts.append("분석 결과:\n" + "\n".join(analysis_summaries))
 
         return "\n\n".join(context_parts)
 
-class MarketRiskEvaluator(BaseRiskEvaluator):
-    """시장 리스크 평가기"""
-
-    def __init__(self):
-        super().__init__("market_risk")
-        self.evaluation_prompt = PromptTemplate(
-            input_variables=["company_name", "industry", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 시장 리스크를 평가해주세요.
-
-회사명: {company_name}
-업종: {industry}
-
-관련 정보:
-{context}
-
-다음 시장 리스크 요소들을 평가해주세요:
-1. 시장 포화도 및 성장 한계
-2. 경기 변동에 대한 민감도
-3. 소비자 선호도 변화 리스크
-4. 신기술 등장으로 인한 시장 변화
-5. 글로벌 시장 진출 시 장벽
-
-평가 기준:
-- 영향도(impact_score): 0-10점 (10이 가장 심각)
-- 발생 확률(probability): 0-1 (1이 확실)
-
-JSON 형식으로 응답해주세요:
-{{
-    "impact_score": 7.5,
-    "probability": 0.6,
-    "description": "시장 리스크 설명",
-    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
-}}"""
+    def _call_model(self, company_info: CompanyInfo, context: str) -> Dict[str, object]:
+        prompt = self.evaluation_prompt.format(
+            company_name=company_info.name,
+            industry=company_info.industry or "업종 정보 없음",
+            context=context or "관련 데이터를 확인할 수 없습니다. 기존 분석과 문서를 기반으로 합리적 추정을 제시하세요.",
         )
+        raw = self.llm(prompt)
+        return self._parse_json(raw)
+
+    @staticmethod
+    def _parse_json(response_text: str) -> Dict[str, object]:
+        try:
+            cleaned = response_text.strip()
+            start = cleaned.find("{")
+            end = cleaned.rfind("}") + 1
+            if start == -1 or end <= start:
+                raise ValueError("JSON boundary not found")
+            return json.loads(cleaned[start:end])
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _coerce_float(value, default: float) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
+
+    @staticmethod
+    def _coerce_text(value, default: str) -> str:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return default
+
+
+class ConfigurableRiskEvaluator(BaseRiskEvaluator):
+    """RISK_DEFINITIONS 기반으로 동작하는 리스크 평가기"""
+
+    def __init__(self, risk_key: str, definition: Dict[str, object]):
+        super().__init__(risk_key, definition)
 
     def evaluate(
         self,
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
+        analysis_results: List[AnalysisResult],
     ) -> RiskAssessment:
-        """시장 리스크 평가 실행"""
         context = self._create_analysis_context(documents, external_results, analysis_results)
+        result = self._call_model(company_info, context)
+        defaults = self.definition.get("defaults", {})
 
-        try:
-            response = self.llm(self.evaluation_prompt.format(
-                company_name=company_info.name,
-                industry=company_info.industry,
-                context=context
-            ))
+        impact_score = self._coerce_float(result.get("impact_score"), defaults.get("impact_score", 5.0))
+        probability = self._coerce_float(result.get("probability"), defaults.get("probability", 0.5))
+        description = self._coerce_text(result.get("description"), "리스크 설명 부족")
 
-            import json
-            risk_data = json.loads(response.strip())
+        mitigation_raw = result.get("mitigation_strategies", [])
+        if not isinstance(mitigation_raw, list):
+            mitigation_raw = []
+        mitigation = [self._coerce_text(item, "") for item in mitigation_raw if item]
 
-            impact_score = risk_data.get("impact_score", 5.0)
-            probability = risk_data.get("probability", 0.5)
-
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=self._calculate_risk_level(impact_score, probability),
-                description=risk_data.get("description", ""),
-                impact_score=impact_score,
-                probability=probability,
-                mitigation_strategies=risk_data.get("mitigation_strategies", [])
-            )
-
-        except Exception as e:
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=RiskLevel.MEDIUM,
-                description=f"시장 리스크 평가 오류: {str(e)}",
-                impact_score=5.0,
-                probability=0.5,
-                mitigation_strategies=[]
-            )
-
-class RegulatoryRiskEvaluator(BaseRiskEvaluator):
-    """규제 리스크 평가기"""
-
-    def __init__(self):
-        super().__init__("regulatory_risk")
-        self.evaluation_prompt = PromptTemplate(
-            input_variables=["company_name", "industry", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 규제 리스크를 평가해주세요.
-
-회사명: {company_name}
-업종: {industry}
-
-관련 정보:
-{context}
-
-다음 규제 리스크 요소들을 평가해주세요:
-1. 현재 규제 위반 가능성
-2. 미래 규제 강화 리스크
-3. 국가별 규제 차이로 인한 확장 제약
-4. 개인정보보호 및 데이터 관련 규제
-5. 업종별 특화 규제 요구사항
-
-JSON 형식으로 응답해주세요:
-{{
-    "impact_score": 6.0,
-    "probability": 0.4,
-    "description": "규제 리스크 설명",
-    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
-}}"""
+        return RiskAssessment(
+            category=self.risk_category,
+            risk_level=self._calculate_risk_level(impact_score, probability),
+            description=description,
+            impact_score=impact_score,
+            probability=probability,
+            mitigation_strategies=mitigation,
         )
 
-    def evaluate(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
-    ) -> RiskAssessment:
-        """규제 리스크 평가 실행"""
-        context = self._create_analysis_context(documents, external_results, analysis_results)
+    def _calculate_risk_level(self, impact_score: float, probability: float) -> RiskLevel:
+        risk_score = impact_score * probability
+        if risk_score >= 8.0:
+            return RiskLevel.CRITICAL
+        if risk_score >= 6.0:
+            return RiskLevel.HIGH
+        if risk_score >= 4.0:
+            return RiskLevel.MEDIUM
+        return RiskLevel.LOW
 
-        try:
-            response = self.llm(self.evaluation_prompt.format(
-                company_name=company_info.name,
-                industry=company_info.industry,
-                context=context
-            ))
-
-            import json
-            risk_data = json.loads(response.strip())
-
-            impact_score = risk_data.get("impact_score", 5.0)
-            probability = risk_data.get("probability", 0.5)
-
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=self._calculate_risk_level(impact_score, probability),
-                description=risk_data.get("description", ""),
-                impact_score=impact_score,
-                probability=probability,
-                mitigation_strategies=risk_data.get("mitigation_strategies", [])
-            )
-
-        except Exception as e:
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=RiskLevel.MEDIUM,
-                description=f"규제 리스크 평가 오류: {str(e)}",
-                impact_score=5.0,
-                probability=0.5,
-                mitigation_strategies=[]
-            )
-
-class CompetitiveRiskEvaluator(BaseRiskEvaluator):
-    """경쟁 리스크 평가기"""
-
-    def __init__(self):
-        super().__init__("competitive_risk")
-        self.evaluation_prompt = PromptTemplate(
-            input_variables=["company_name", "industry", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 경쟁 리스크를 평가해주세요.
-
-회사명: {company_name}
-업종: {industry}
-
-관련 정보:
-{context}
-
-다음 경쟁 리스크 요소들을 평가해주세요:
-1. 기존 대기업의 시장 진입 위험
-2. 신규 경쟁자의 등장 가능성
-3. 대체재 출현 리스크
-4. 가격 경쟁 심화 위험
-5. 핵심 인재 유출 리스크
-
-JSON 형식으로 응답해주세요:
-{{
-    "impact_score": 8.0,
-    "probability": 0.7,
-    "description": "경쟁 리스크 설명",
-    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
-}}"""
-        )
-
-    def evaluate(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
-    ) -> RiskAssessment:
-        """경쟁 리스크 평가 실행"""
-        context = self._create_analysis_context(documents, external_results, analysis_results)
-
-        try:
-            response = self.llm(self.evaluation_prompt.format(
-                company_name=company_info.name,
-                industry=company_info.industry,
-                context=context
-            ))
-
-            import json
-            risk_data = json.loads(response.strip())
-
-            impact_score = risk_data.get("impact_score", 5.0)
-            probability = risk_data.get("probability", 0.5)
-
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=self._calculate_risk_level(impact_score, probability),
-                description=risk_data.get("description", ""),
-                impact_score=impact_score,
-                probability=probability,
-                mitigation_strategies=risk_data.get("mitigation_strategies", [])
-            )
-
-        except Exception as e:
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=RiskLevel.MEDIUM,
-                description=f"경쟁 리스크 평가 오류: {str(e)}",
-                impact_score=5.0,
-                probability=0.5,
-                mitigation_strategies=[]
-            )
-
-class FinancialRiskEvaluator(BaseRiskEvaluator):
-    """재무 리스크 평가기"""
-
-    def __init__(self):
-        super().__init__("financial_risk")
-        self.evaluation_prompt = PromptTemplate(
-            input_variables=["company_name", "industry", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 재무 리스크를 평가해주세요.
-
-회사명: {company_name}
-업종: {industry}
-
-관련 정보:
-{context}
-
-다음 재무 리스크 요소들을 평가해주세요:
-1. 현금 소진 위험 (burn rate vs runway)
-2. 추가 투자 유치 실패 리스크
-3. 수익성 달성 지연 위험
-4. 고정비 부담 증가 리스크
-5. 환율 및 이자율 변동 리스크
-
-JSON 형식으로 응답해주세요:
-{{
-    "impact_score": 9.0,
-    "probability": 0.5,
-    "description": "재무 리스크 설명",
-    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
-}}"""
-        )
-
-    def evaluate(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
-    ) -> RiskAssessment:
-        """재무 리스크 평가 실행"""
-        context = self._create_analysis_context(documents, external_results, analysis_results)
-
-        try:
-            response = self.llm(self.evaluation_prompt.format(
-                company_name=company_info.name,
-                industry=company_info.industry,
-                context=context
-            ))
-
-            import json
-            risk_data = json.loads(response.strip())
-
-            impact_score = risk_data.get("impact_score", 5.0)
-            probability = risk_data.get("probability", 0.5)
-
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=self._calculate_risk_level(impact_score, probability),
-                description=risk_data.get("description", ""),
-                impact_score=impact_score,
-                probability=probability,
-                mitigation_strategies=risk_data.get("mitigation_strategies", [])
-            )
-
-        except Exception as e:
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=RiskLevel.MEDIUM,
-                description=f"재무 리스크 평가 오류: {str(e)}",
-                impact_score=5.0,
-                probability=0.5,
-                mitigation_strategies=[]
-            )
-
-class TechnologyRiskEvaluator(BaseRiskEvaluator):
-    """기술 리스크 평가기"""
-
-    def __init__(self):
-        super().__init__("technology_risk")
-        self.evaluation_prompt = PromptTemplate(
-            input_variables=["company_name", "industry", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 기술 리스크를 평가해주세요.
-
-회사명: {company_name}
-업종: {industry}
-
-관련 정보:
-{context}
-
-다음 기술 리스크 요소들을 평가해주세요:
-1. 핵심 기술의 노후화 위험
-2. 보안 취약점 및 사이버 공격 리스크
-3. 기술 인재 이탈 위험
-4. 플랫폼 의존성 리스크
-5. 스케일링 시 기술적 한계
-
-JSON 형식으로 응답해주세요:
-{{
-    "impact_score": 6.5,
-    "probability": 0.4,
-    "description": "기술 리스크 설명",
-    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
-}}"""
-        )
-
-    def evaluate(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
-    ) -> RiskAssessment:
-        """기술 리스크 평가 실행"""
-        context = self._create_analysis_context(documents, external_results, analysis_results)
-
-        try:
-            response = self.llm(self.evaluation_prompt.format(
-                company_name=company_info.name,
-                industry=company_info.industry,
-                context=context
-            ))
-
-            import json
-            risk_data = json.loads(response.strip())
-
-            impact_score = risk_data.get("impact_score", 5.0)
-            probability = risk_data.get("probability", 0.5)
-
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=self._calculate_risk_level(impact_score, probability),
-                description=risk_data.get("description", ""),
-                impact_score=impact_score,
-                probability=probability,
-                mitigation_strategies=risk_data.get("mitigation_strategies", [])
-            )
-
-        except Exception as e:
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=RiskLevel.MEDIUM,
-                description=f"기술 리스크 평가 오류: {str(e)}",
-                impact_score=5.0,
-                probability=0.5,
-                mitigation_strategies=[]
-            )
-
-class TeamRiskEvaluator(BaseRiskEvaluator):
-    """팀 리스크 평가기"""
-
-    def __init__(self):
-        super().__init__("team_risk")
-        self.evaluation_prompt = PromptTemplate(
-            input_variables=["company_name", "industry", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 팀 관련 리스크를 평가해주세요.
-
-회사명: {company_name}
-업종: {industry}
-
-관련 정보:
-{context}
-
-다음 팀 리스크 요소들을 평가해주세요:
-1. 창업자/핵심 인재 이탈 위험
-2. 팀 내부 갈등 및 분열 가능성
-3. 핵심 기술자 확보 어려움
-4. 조직 문화 및 관리 체계 미비
-5. 성장에 따른 인재 관리 어려움
-
-JSON 형식으로 응답해주세요:
-{{
-    "impact_score": 8.5,
-    "probability": 0.3,
-    "description": "팀 리스크 설명",
-    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
-}}"""
-        )
-
-    def evaluate(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
-    ) -> RiskAssessment:
-        """팀 리스크 평가 실행"""
-        context = self._create_analysis_context(documents, external_results, analysis_results)
-
-        try:
-            response = self.llm(self.evaluation_prompt.format(
-                company_name=company_info.name,
-                industry=company_info.industry,
-                context=context
-            ))
-
-            import json
-            risk_data = json.loads(response.strip())
-
-            impact_score = risk_data.get("impact_score", 5.0)
-            probability = risk_data.get("probability", 0.5)
-
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=self._calculate_risk_level(impact_score, probability),
-                description=risk_data.get("description", ""),
-                impact_score=impact_score,
-                probability=probability,
-                mitigation_strategies=risk_data.get("mitigation_strategies", [])
-            )
-
-        except Exception as e:
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=RiskLevel.MEDIUM,
-                description=f"팀 리스크 평가 오류: {str(e)}",
-                impact_score=5.0,
-                probability=0.5,
-                mitigation_strategies=[]
-            )
 
 class RiskEvaluator:
     """리스크 평가 메인 클래스"""
 
     def __init__(self):
         self.risk_evaluators = {
-            "market_risk": MarketRiskEvaluator(),
-            "regulatory_risk": RegulatoryRiskEvaluator(),
-            "competitive_risk": CompetitiveRiskEvaluator(),
-            "financial_risk": FinancialRiskEvaluator(),
-            "technology_risk": TechnologyRiskEvaluator(),
-            "team_risk": TeamRiskEvaluator()
+            key: ConfigurableRiskEvaluator(key, definition)
+            for key, definition in RISK_DEFINITIONS.items()
         }
 
     def evaluate_all_risks(
@@ -540,184 +275,96 @@ class RiskEvaluator:
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
         analysis_results: List[AnalysisResult],
-        selected_risks: List[str] = None
+        selected_risks: List[str] = None,
     ) -> List[RiskAssessment]:
-        """모든 리스크 평가 실행 (병렬)"""
-
         if selected_risks is None:
             selected_risks = list(self.risk_evaluators.keys())
 
-        # 선택된 리스크 평가기들만 실행
-        selected_evaluators = {
-            name: evaluator for name, evaluator in self.risk_evaluators.items()
+        selected = {
+            name: evaluator
+            for name, evaluator in self.risk_evaluators.items()
             if name in selected_risks
         }
 
-        # ThreadPoolExecutor를 사용한 병렬 실행
-        with ThreadPoolExecutor(max_workers=len(selected_evaluators)) as executor:
-            future_to_evaluator = {
+        with ThreadPoolExecutor(max_workers=len(selected)) as executor:
+            future_to_name = {
                 executor.submit(
                     evaluator.evaluate,
-                    company_info, documents, external_results, analysis_results
+                    company_info,
+                    documents,
+                    external_results,
+                    analysis_results,
                 ): name
-                for name, evaluator in selected_evaluators.items()
+                for name, evaluator in selected.items()
             }
 
-            risk_assessments = []
-            for future in future_to_evaluator:
+            results: List[RiskAssessment] = []
+            for future in future_to_name:
+                name = future_to_name[future]
                 try:
-                    result = future.result(timeout=60)  # 60초 타임아웃
-                    risk_assessments.append(result)
-                except Exception as e:
-                    evaluator_name = future_to_evaluator[future]
-                    error_assessment = RiskAssessment(
-                        category=evaluator_name,
-                        risk_level=RiskLevel.MEDIUM,
-                        description=f"{evaluator_name} 평가 실패: {str(e)}",
-                        impact_score=5.0,
-                        probability=0.5,
-                        mitigation_strategies=[]
+                    results.append(future.result(timeout=60))
+                except Exception as err:  # pragma: no cover (LLM 오류 대비)
+                    results.append(
+                        RiskAssessment(
+                            category=name,
+                            risk_level=RiskLevel.MEDIUM,
+                            description=f"{name} 평가 실패: {err}",
+                            impact_score=5.0,
+                            probability=0.5,
+                            mitigation_strategies=[],
+                        )
                     )
-                    risk_assessments.append(error_assessment)
 
-        return risk_assessments
+        return results
 
     def calculate_overall_risk_level(self, risk_assessments: List[RiskAssessment]) -> RiskLevel:
-        """전체 리스크 레벨 계산"""
         if not risk_assessments:
             return RiskLevel.MEDIUM
 
-        # 리스크 레벨을 숫자로 변환
-        risk_level_values = {
-            RiskLevel.LOW: 1,
-            RiskLevel.MEDIUM: 2,
-            RiskLevel.HIGH: 3,
-            RiskLevel.CRITICAL: 4
+        level_map = {
+            RiskLevel.LOW: 1.0,
+            RiskLevel.MEDIUM: 2.0,
+            RiskLevel.HIGH: 3.0,
+            RiskLevel.CRITICAL: 4.0,
         }
 
-        # 가중 평균 계산 (영향도와 확률 고려)
-        total_weighted_risk = 0.0
+        weighted_sum = 0.0
         total_weight = 0.0
-
         for assessment in risk_assessments:
-            risk_value = risk_level_values[assessment.risk_level]
             weight = assessment.impact_score * assessment.probability
-            total_weighted_risk += risk_value * weight
+            weighted_sum += level_map.get(assessment.risk_level, 2.0) * weight
             total_weight += weight
 
         if total_weight == 0:
             return RiskLevel.MEDIUM
 
-        average_risk = total_weighted_risk / total_weight
-
-        # 평균값을 리스크 레벨로 변환
-        if average_risk >= 3.5:
+        average = weighted_sum / total_weight
+        if average >= 3.5:
             return RiskLevel.CRITICAL
-        elif average_risk >= 2.5:
+        if average >= 2.5:
             return RiskLevel.HIGH
-        elif average_risk >= 1.5:
+        if average >= 1.5:
             return RiskLevel.MEDIUM
-        else:
-            return RiskLevel.LOW
+        return RiskLevel.LOW
 
-class CompetitiveRiskEvaluator(BaseRiskEvaluator):
-    """경쟁 리스크 평가기 (누락된 클래스 추가)"""
-
-    def __init__(self):
-        super().__init__("competitive_risk")
-        self.evaluation_prompt = PromptTemplate(
-            input_variables=["company_name", "industry", "context"],
-            template="""다음 정보를 바탕으로 {company_name}의 경쟁 리스크를 평가해주세요.
-
-회사명: {company_name}
-업종: {industry}
-
-관련 정보:
-{context}
-
-다음 경쟁 리스크 요소들을 평가해주세요:
-1. 기존 대기업의 시장 진입 위험
-2. 신규 경쟁자의 등장 가능성
-3. 대체재 출현 리스크
-4. 가격 경쟁 심화 위험
-5. 시장 점유율 감소 위험
-
-JSON 형식으로 응답해주세요:
-{{
-    "impact_score": 7.0,
-    "probability": 0.6,
-    "description": "경쟁 리스크 설명",
-    "mitigation_strategies": ["완화 전략 1", "완화 전략 2"]
-}}"""
-        )
-
-    def evaluate(
-        self,
-        company_info: CompanyInfo,
-        documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
-    ) -> RiskAssessment:
-        """경쟁 리스크 평가 실행"""
-        context = self._create_analysis_context(documents, external_results, analysis_results)
-
-        try:
-            response = self.llm(self.evaluation_prompt.format(
-                company_name=company_info.name,
-                industry=company_info.industry,
-                context=context
-            ))
-
-            import json
-            risk_data = json.loads(response.strip())
-
-            impact_score = risk_data.get("impact_score", 5.0)
-            probability = risk_data.get("probability", 0.5)
-
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=self._calculate_risk_level(impact_score, probability),
-                description=risk_data.get("description", ""),
-                impact_score=impact_score,
-                probability=probability,
-                mitigation_strategies=risk_data.get("mitigation_strategies", [])
-            )
-
-        except Exception as e:
-            return RiskAssessment(
-                category=self.risk_category,
-                risk_level=RiskLevel.MEDIUM,
-                description=f"경쟁 리스크 평가 오류: {str(e)}",
-                impact_score=5.0,
-                probability=0.5,
-                mitigation_strategies=[]
-            )
 
 def create_risk_assessment_layer() -> RiskEvaluator:
-    """Risk Assessment Layer 생성자"""
     return RiskEvaluator()
 
-def process_risk_assessment_layer(context: PipelineContext) -> PipelineContext:
-    """Risk Assessment Layer 처리 함수"""
-    risk_evaluator = create_risk_assessment_layer()
 
-    # 리스크 평가 실행
-    risk_assessments = risk_evaluator.evaluate_all_risks(
+def process_risk_assessment_layer(context: PipelineContext) -> PipelineContext:
+    evaluator = create_risk_assessment_layer()
+    risk_assessments = evaluator.evaluate_all_risks(
         company_info=context.company_info,
         documents=context.retrieved_documents,
         external_results=context.external_search_results,
-        analysis_results=context.analysis_results
+        analysis_results=context.analysis_results,
     )
 
     context.risk_assessments = risk_assessments
-
-    # 전체 리스크 레벨 계산
-    overall_risk_level = risk_evaluator.calculate_overall_risk_level(risk_assessments)
-
-    # 처리 단계 기록
+    overall = evaluator.calculate_overall_risk_level(risk_assessments)
     context.processing_steps.append(
-        f"RISK_ASSESSMENT_LAYER: {len(risk_assessments)}개 리스크 평가 완료, "
-        f"전체 리스크: {overall_risk_level.value}"
+        "RISK_ASSESSMENT_LAYER: "
+        f"{len(risk_assessments)}개 리스크 평가 완료, 전체 리스크 {overall.value}"
     )
-
     return context

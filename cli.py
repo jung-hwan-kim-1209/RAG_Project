@@ -7,6 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from pipeline import run_investment_evaluation, create_pipeline
+from langgraph_pipeline import run_langgraph_investment_evaluation
 from layers.knowledge_base_layer import create_knowledge_base_layer
 
 # 환경 변수 로드
@@ -28,7 +29,11 @@ def cli():
 @click.option('--skip-external', is_flag=True, help='외부 검색 건너뛰기')
 @click.option('--retries', default=1, help='최대 재시도 횟수')
 @click.option('--verbose', '-v', is_flag=True, help='상세 로그 출력')
-def evaluate(company_query, format, save, output, skip_external, retries, verbose):
+@click.option('--engine', default='sequential',
+              type=click.Choice(['sequential', 'graph']),
+              show_default=True,
+              help='실행 파이프라인 엔진 선택')
+def evaluate(company_query, format, save, output, skip_external, retries, verbose, engine):
     """스타트업 투자 가치 평가
 
     예시:
@@ -52,14 +57,24 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
         click.echo(f"🚀 {company_query} 투자 평가를 시작합니다...")
 
         # 파이프라인 실행
-        result = run_investment_evaluation(
-            user_input=company_query,
-            output_format=format,
-            save_to_file=save,
-            output_path=output,
-            skip_external_search=skip_external,
-            max_retries=retries
-        )
+        if engine == 'graph':
+            result = run_langgraph_investment_evaluation(
+                user_input=company_query,
+                output_format=format,
+                save_to_file=save,
+                output_path=output,
+                skip_external_search=skip_external,
+                max_retries=retries
+            )
+        else:
+            result = run_investment_evaluation(
+                user_input=company_query,
+                output_format=format,
+                save_to_file=save,
+                output_path=output,
+                skip_external_search=skip_external,
+                max_retries=retries
+            )
 
         click.echo(result)
 

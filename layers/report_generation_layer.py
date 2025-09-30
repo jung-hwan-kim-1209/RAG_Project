@@ -26,8 +26,14 @@ class UnicornReportGenerator:
 
         # Executive Summary 생성 프롬프트
         self.executive_summary_prompt = PromptTemplate(
-            input_variables=["company_name", "total_score", "grade", "unicorn_probability", "recommendation"],
-            template="""다음 정보를 바탕으로 {company_name}에 대한 투자 평가 Executive Summary를 작성해주세요.
+            input_variables=[
+                "company_name",
+                "total_score",
+                "grade",
+                "unicorn_probability",
+                "recommendation",
+            ],
+            template="""다음 정보를 바탕으로 {company_name}의 투자 평가 Executive Summary를 작성하세요.
 
 회사명: {company_name}
 종합 점수: {total_score}/100
@@ -35,55 +41,50 @@ class UnicornReportGenerator:
 유니콘 확률: {unicorn_probability:.1%}
 투자 추천: {recommendation}
 
-Executive Summary는 다음 구조로 작성해주세요:
-1. 핵심 결론 (2-3줄)
-2. 주요 강점 (3-4개 항목)
-3. 주요 우려사항 (2-3개 항목)
-4. 투자 권장사항 (1-2줄)
-
-전문적이고 간결한 투자 보고서 형식으로 작성해주세요."""
+작성 지침:
+- 핵심 결론, 주요 강점, 주요 우려사항, 투자 권장사항을 Markdown 목록 형태로 명확히 구분합니다.
+- 가능한 경우 내부 문서/외부 검색에서 확보한 정량 지표(%)·금액·추세를 문장 안에 포함합니다.
+- 근거가 부족한 항목은 “근거 부족”이라고 명시하세요.
+- 어조는 객관적·전문적으로 유지합니다."""
         )
 
         # 상세 분석 요약 프롬프트
         self.detailed_analysis_prompt = PromptTemplate(
             input_variables=["company_name", "analysis_results", "risk_assessments"],
-            template="""다음 분석 결과들을 바탕으로 {company_name}에 대한 상세 분석 보고서를 작성해주세요.
+            template="""다음 데이터를 활용하여 {company_name}의 상세 분석 보고서를 작성하세요.
 
-분석 결과:
+분석 결과 요약:
 {analysis_results}
 
-리스크 평가:
+리스크 평가 요약:
 {risk_assessments}
 
-다음 섹션별로 구성해주세요:
-1. 성장성 분석
-2. 비즈니스 모델 평가
-3. 기술력 및 보안성
-4. 재무 건전성
-5. 팀 역량 평가
-6. 규제 환경 분석
-7. 파트너십 및 네트워크
-
-각 섹션은 점수, 주요 발견사항, 개선 권장사항을 포함해주세요."""
+작성 지침:
+- 아래 7개 섹션을 모두 포함하고, 섹션마다 점수(또는 등급)·핵심 인사이트·개선 권장사항을 명시합니다.
+  1) 성장성 분석
+  2) 비즈니스 모델 평가
+  3) 기술력 및 보안성
+  4) 재무 건전성
+  5) 팀 역량 평가
+  6) 규제 환경 분석
+  7) 파트너십 및 네트워크
+- 각 섹션에는 해당 수치, 표, 사례 등 정량/정성 근거를 포함합니다. 근거가 부족하면 “데이터 보강 필요”라고 표시합니다.
+- Markdown 서브헤더를 활용해 가독성을 높이고, 리스트를 사용해 항목을 정리합니다."""
         )
 
         # 투자 근거 프롬프트
         self.investment_rationale_prompt = PromptTemplate(
             input_variables=["company_name", "recommendation", "unicorn_score", "key_factors"],
-            template="""다음 정보를 바탕으로 {company_name}에 대한 투자 근거를 작성해주세요.
+            template="""다음 정보를 바탕으로 {company_name}에 대한 투자 근거를 작성하세요.
 
 투자 추천: {recommendation}
 유니콘 점수: {unicorn_score}
-주요 요인들: {key_factors}
+핵심 요인: {key_factors}
 
-투자 근거는 다음을 포함해주세요:
-1. 투자 결정의 핵심 논리
-2. 예상 수익률 및 리스크 균형
-3. 투자 타이밍의 적절성
-4. 포트폴리오 내 포지셔닝
-5. Exit 전략 고려사항
-
-투자자 관점에서 명확하고 설득력 있게 작성해주세요."""
+작성 지침:
+- 투자 결정 근거, 기대 수익/리스크 균형, 투자 타이밍, 포트폴리오 내 역할, Exit 전략을 각각 두세 문장으로 정리합니다.
+- 각 문단에는 최소 하나 이상의 정량 지표 또는 리스크 요약을 포함해 설득력을 높입니다.
+- 데이터가 부족한 항목은 추가 조사 필요성을 명확히 언급합니다."""
         )
 
     def determine_investment_recommendation(

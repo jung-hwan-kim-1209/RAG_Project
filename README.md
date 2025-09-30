@@ -81,6 +81,9 @@ python cli.py evaluate "카카오 성장성 분석" --format json
 # 파일 저장
 python cli.py evaluate "배달의민족 리스크 평가" --save --output report.json
 
+# 그래프 엔진( LangGraph )으로 실행
+python cli.py evaluate "토스 투자 분석" --engine graph
+
 # 빠른 평가 (외부 검색 없이)
 python cli.py quick "쿠팡 투자 분석"
 ```
@@ -97,6 +100,8 @@ python cli.py quick "쿠팡 투자 분석"
 | `status` | 시스템 상태 확인 | `python cli.py status` |
 | `config` | 현재 설정 확인 | `python cli.py config` |
 | `demo` | 데모 실행 | `python cli.py demo` |
+
+> `--engine graph` 옵션은 LangGraph 기반 파이프라인을 실행합니다.
 
 ## 💡 사용 예시
 

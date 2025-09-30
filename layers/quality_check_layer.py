@@ -1,18 +1,28 @@
 """
 Layer 9: QUALITY CHECK LAYER
-relevance_checker를 실행하여 답변의 관련성, 근거 충분성, 객관성을 검증하는 레이어
+생성된 보고서의 관련성, 근거 품질, 객관성을 검증한다.
+향후 그래프 노드 전환 시를 대비하여 JSON 파싱과 기본값 처리를 강화한다.
 """
-from typing import List, Dict, Any, Optional
+
+import json
+import re
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 
-import re
-from datetime import datetime
-from models import (
-    QualityCheckResult, InvestmentReport, AnalysisResult,
-    RiskAssessment, DocumentChunk, ExternalSearchResult, PipelineContext, RiskLevel
-)
 from config import get_config
+from models import (
+    AnalysisResult,
+    DocumentChunk,
+    ExternalSearchResult,
+    InvestmentReport,
+    PipelineContext,
+    QualityCheckResult,
+    RiskAssessment,
+    RiskLevel,
+)
 
 class RelevanceChecker:
     """관련성 검증기"""
@@ -57,26 +67,35 @@ JSON 형식으로 응답해주세요:
     ) -> float:
         """관련성 점수 계산"""
         try:
-            # 리포트 내용 요약
-            report_summary = f"""
-            Executive Summary: {report.executive_summary[:300]}...
-            총점: {report.unicorn_score.total_score}
-            추천: {report.recommendation.value}
-            """
-
-            response = self.llm(self.relevance_check_prompt.format(
-                company_name=company_name,
-                user_request=user_request,
-                report_content=report_summary
-            ))
-
-            import json
-            result_data = json.loads(response.strip())
+            summary = (
+                f"Executive Summary: {report.executive_summary[:300]}...\n"
+                f"총점: {report.unicorn_score.total_score}\n"
+                f"추천: {report.recommendation.value}"
+            )
+            response = self.llm(
+                self.relevance_check_prompt.format(
+                    company_name=company_name,
+                    user_request=user_request,
+                    report_content=summary,
+                )
+            )
+            result_data = self._parse_json(response)
             return result_data.get("relevance_score", 5.0) / 10.0
 
-        except Exception as e:
-            # 기본 관련성 점수 계산
+        except Exception:  # pragma: no cover
             return self._calculate_basic_relevance(company_name, report)
+
+    @staticmethod
+    def _parse_json(response_text: str) -> Dict[str, Any]:
+        try:
+            cleaned = response_text.strip()
+            start = cleaned.find("{")
+            end = cleaned.rfind("}") + 1
+            if start == -1 or end <= start:
+                raise ValueError
+            return json.loads(cleaned[start:end])
+        except Exception:
+            return {}
 
     def _calculate_basic_relevance(self, company_name: str, report: InvestmentReport) -> float:
         """기본 관련성 계산"""
@@ -231,31 +250,40 @@ JSON 형식으로 응답해주세요:
     def check_objectivity(self, report: InvestmentReport) -> Dict[str, Any]:
         """객관성 점수 계산"""
         try:
-            # 리포트 주요 내용 추출
-            report_content = f"""
-            Executive Summary: {report.executive_summary}
-            Investment Rationale: {report.investment_rationale[:500]}
-            """
+            report_content = (
+                f"Executive Summary: {report.executive_summary[:500]}\n"
+                f"Investment Rationale: {report.investment_rationale[:500]}"
+            )
 
-            response = self.llm(self.objectivity_prompt.format(
-                report_content=report_content
-            ))
-
-            import json
-            objectivity_data = json.loads(response.strip())
+            response = self.llm(
+                self.objectivity_prompt.format(report_content=report_content)
+            )
+            objectivity_data = self._parse_json(response)
 
             return {
                 "score": objectivity_data.get("objectivity_score", 5.0) / 10.0,
                 "bias_indicators": objectivity_data.get("bias_indicators", []),
-                "improvement_suggestions": objectivity_data.get("improvement_suggestions", [])
+                "improvement_suggestions": objectivity_data.get("improvement_suggestions", []),
             }
 
-        except Exception as e:
+        except Exception as err:  # pragma: no cover
             return {
-                "score": 0.7,  # 기본 객관성 점수
+                "score": 0.7,
                 "bias_indicators": [],
-                "improvement_suggestions": [f"객관성 평가 오류: {str(e)}"]
+                "improvement_suggestions": [f"객관성 평가 오류: {err}"],
             }
+
+    @staticmethod
+    def _parse_json(response_text: str) -> Dict[str, Any]:
+        try:
+            cleaned = response_text.strip()
+            start = cleaned.find("{")
+            end = cleaned.rfind("}") + 1
+            if start == -1 or end <= start:
+                raise ValueError
+            return json.loads(cleaned[start:end])
+        except Exception:
+            return {}
 
 class QualityChecker:
     """품질 검증 메인 클래스"""
@@ -456,9 +484,16 @@ class QualityCheckLayer:
         if quality_result.overall_quality < 0.6:
             recommendations.append("전반적인 분석 품질 향상 필요")
 
-        recommendations.extend(quality_result.suggestions)
+        recommendations.extend(str(item) for item in quality_result.suggestions)
 
-        return list(set(recommendations))  # 중복 제거
+        # 입력 순서를 유지하면서 중복 제거
+        seen = set()
+        ordered: List[str] = []
+        for item in recommendations:
+            if item not in seen:
+                seen.add(item)
+                ordered.append(item)
+        return ordered
 
 def create_quality_check_layer() -> QualityCheckLayer:
     """Quality Check Layer 생성자"""
