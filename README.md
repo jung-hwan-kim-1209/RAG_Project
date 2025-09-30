@@ -148,15 +148,12 @@ result = pipeline.execute_pipeline(
 탄탄한 기술력과 우수한 팀 역량을 바탕으로 지속가능한 성장이
 기대됩니다.
 
-📈 영역별 점수카드
+📈 영역별 점수카드 (4개 분석기)
 ----------------------------------------
 growth_analysis          85.0점 (A급)
 business_model_analysis  88.5점 (A급)
 tech_security_analysis   90.0점 (S급)
 financial_health_analysis 85.0점 (A급)
-team_evaluation         87.0점 (A급)
-regulatory_analysis     80.0점 (B급)
-partnership_analysis    85.5점 (A급)
 
 ⚠️ 리스크 평가
 ----------------------------------------

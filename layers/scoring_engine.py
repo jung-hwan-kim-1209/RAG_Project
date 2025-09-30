@@ -64,7 +64,7 @@ JSON 형식으로 응답해주세요:
         for result in analysis_results:
             category_scores[result.category] = result.score
 
-        # 가중치 적용
+        # 가중치 적용 (4개 분석기만 사용)
         weighted_scores["growth_analysis"] = (
             category_scores.get("growth_analysis", 0) * self.analysis_weights.growth_weight
         )
@@ -76,15 +76,6 @@ JSON 형식으로 응답해주세요:
         )
         weighted_scores["financial_health_analysis"] = (
             category_scores.get("financial_health_analysis", 0) * self.analysis_weights.financial_health_weight
-        )
-        weighted_scores["team_evaluation"] = (
-            category_scores.get("team_evaluation", 0) * self.analysis_weights.team_weight
-        )
-        weighted_scores["regulatory_analysis"] = (
-            category_scores.get("regulatory_analysis", 0) * self.analysis_weights.regulatory_weight
-        )
-        weighted_scores["partnership_analysis"] = (
-            category_scores.get("partnership_analysis", 0) * self.analysis_weights.partnership_weight
         )
 
         return category_scores, weighted_scores
@@ -208,10 +199,7 @@ JSON 형식으로 응답해주세요:
                 "growth_analysis": self.analysis_weights.growth_weight,
                 "business_model_analysis": self.analysis_weights.business_model_weight,
                 "tech_security_analysis": self.analysis_weights.tech_security_weight,
-                "financial_health_analysis": self.analysis_weights.financial_health_weight,
-                "team_evaluation": self.analysis_weights.team_weight,
-                "regulatory_analysis": self.analysis_weights.regulatory_weight,
-                "partnership_analysis": self.analysis_weights.partnership_weight
+                "financial_health_analysis": self.analysis_weights.financial_health_weight
             },
             "category_grades": {
                 result.category: result.grade for result in analysis_results

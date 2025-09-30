@@ -359,7 +359,7 @@ class QualityChecker:
         suggestions = []
 
         # 분석 결과 완성도 확인
-        if len(report.analysis_results) < 5:
+        if len(report.analysis_results) < 4:
             issues.append("분석 영역 부족")
             suggestions.append("모든 분석 영역 완료 필요")
 

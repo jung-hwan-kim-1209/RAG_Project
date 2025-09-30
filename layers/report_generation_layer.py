@@ -66,9 +66,6 @@ Executive Summary는 다음 구조로 작성해주세요:
 2. 비즈니스 모델 평가
 3. 기술력 및 보안성
 4. 재무 건전성
-5. 팀 역량 평가
-6. 규제 환경 분석
-7. 파트너십 및 네트워크
 
 각 섹션은 점수, 주요 발견사항, 개선 권장사항을 포함해주세요."""
         )
@@ -265,7 +262,7 @@ Executive Summary는 다음 구조로 작성해주세요:
         confidence_factors.append(data_confidence)
 
         # 분석 완성도 기반 신뢰도
-        max_analysis_areas = int(os.getenv("MAX_ANALYSIS_AREAS", "7"))
+        max_analysis_areas = int(os.getenv("MAX_ANALYSIS_AREAS", "4"))
         analysis_confidence = len(analysis_results) / max_analysis_areas
         confidence_factors.append(analysis_confidence)
 
