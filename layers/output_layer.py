@@ -4,7 +4,7 @@ Layer 10: OUTPUT LAYER
 """
 import json
 import csv
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 from pathlib import Path
 
@@ -12,7 +12,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import InvestmentReport, QualityCheckResult, PipelineContext
+from models import InvestmentReport, QualityCheckResult, PipelineContext, GPTResponse
 from layers.report_generation_layer import ReportFormatter
 
 class OutputProcessor:
@@ -34,8 +34,8 @@ class OutputProcessor:
             else:
                 quality_status = f"⚠️ 품질 검증 실패 (이슈: {len(context.quality_check.issues)}개)"
 
-        # 기본 리포트 포맷팅
-        formatted_report = self.formatter.format_console_report(context.final_report)
+        # 기본 리포트 포맷팅 (GPT 응답 포함)
+        formatted_report = self.formatter.format_console_report(context.final_report, context.gpt_responses)
 
         # 품질 정보 추가
         if quality_status:
@@ -53,7 +53,8 @@ class OutputProcessor:
         self,
         report: InvestmentReport,
         output_path: str,
-        format_type: str = "json"
+        format_type: str = "json",
+        gpt_responses: List[GPTResponse] = None
     ) -> bool:
         """리포트를 파일로 저장"""
         try:
@@ -66,9 +67,15 @@ class OutputProcessor:
                     json.dump(json_data, f, ensure_ascii=False, indent=2)
 
             elif format_type == "txt":
-                text_report = self.formatter.format_console_report(report)
+                text_report = self.formatter.format_console_report(report, gpt_responses)
                 with open(output_file, 'w', encoding='utf-8') as f:
                     f.write(text_report)
+
+            elif format_type == "pdf":
+                return self.formatter.export_to_pdf(report, gpt_responses, str(output_file))
+
+            elif format_type == "word":
+                return self.formatter.export_to_word(report, gpt_responses, str(output_file))
 
             elif format_type == "csv":
                 self._save_as_csv(report, output_file)
@@ -144,8 +151,19 @@ class OutputLayer:
 
             # 파일 저장 옵션
             if save_to_file and output_path and context.final_report:
+                # 파일 확장자에 따라 포맷 결정
+                file_ext = Path(output_path).suffix.lower()
+                if file_ext == ".pdf":
+                    format_type = "pdf"
+                elif file_ext == ".docx":
+                    format_type = "word"
+                elif file_ext == ".txt":
+                    format_type = "txt"
+                else:
+                    format_type = "json"
+                
                 self.output_processor.save_report_to_file(
-                    context.final_report, output_path, "json"
+                    context.final_report, output_path, format_type, context.gpt_responses
                 )
 
             return output

@@ -13,7 +13,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import AnalysisResult, DocumentChunk, ExternalSearchResult, PipelineContext, CompanyInfo
+from models import AnalysisResult, DocumentChunk, ExternalSearchResult, PipelineContext, CompanyInfo, GPTResponse
 from config import get_config
 
 class BaseAnalyzer:
@@ -32,7 +32,8 @@ class BaseAnalyzer:
         self,
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
+        external_results: List[ExternalSearchResult],
+        context: PipelineContext = None
     ) -> AnalysisResult:
         """분석 실행 (하위 클래스에서 구현)"""
         raise NotImplementedError
@@ -113,24 +114,37 @@ JSON 형식으로 응답해주세요:
         self,
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
+        external_results: List[ExternalSearchResult],
+        context: PipelineContext = None
     ) -> AnalysisResult:
         """성장성 분석 실행"""
-        context = self._create_context_summary(documents, external_results)
+        context_summary = self._create_context_summary(documents, external_results)
         company_info_text = f"업종: {company_info.industry}, 설립년도: {company_info.founded_year}, 본사: {company_info.headquarters}"
 
         try:
-            response = self.llm.invoke(self.analysis_prompt.format(
+            formatted_prompt = self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
-                context=context
-            ))
+                context=context_summary
+            )
+            
+            response = self.llm.invoke(formatted_prompt)
 
             # GPT 응답을 터미널에 출력
             print(f"\n🔍 {self.analyzer_name.upper()} - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
+
+            # GPT 응답을 컨텍스트에 저장
+            if context:
+                gpt_response = GPTResponse(
+                    layer_name="ANALYSIS_ENGINE",
+                    analyzer_name=self.analyzer_name,
+                    prompt=formatted_prompt,
+                    response=response.content
+                )
+                context.gpt_responses.append(gpt_response)
 
             import json
             result_data = json.loads(response.content.strip())
@@ -196,24 +210,37 @@ JSON 형식으로 응답해주세요:
         self,
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
+        external_results: List[ExternalSearchResult],
+        context: PipelineContext = None
     ) -> AnalysisResult:
         """비즈니스 모델 분석 실행"""
-        context = self._create_context_summary(documents, external_results)
+        context_summary = self._create_context_summary(documents, external_results)
         company_info_text = f"업종: {company_info.industry}, 설명: {company_info.description}"
 
         try:
-            response = self.llm.invoke(self.analysis_prompt.format(
+            formatted_prompt = self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
-                context=context
-            ))
+                context=context_summary
+            )
+            
+            response = self.llm.invoke(formatted_prompt)
 
             # GPT 응답을 터미널에 출력
             print(f"\n🔍 {self.analyzer_name.upper()} - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
+
+            # GPT 응답을 컨텍스트에 저장
+            if context:
+                gpt_response = GPTResponse(
+                    layer_name="ANALYSIS_ENGINE",
+                    analyzer_name=self.analyzer_name,
+                    prompt=formatted_prompt,
+                    response=response.content
+                )
+                context.gpt_responses.append(gpt_response)
 
             import json
             result_data = json.loads(response.content.strip())
@@ -278,24 +305,37 @@ JSON 형식으로 응답해주세요:
         self,
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
+        external_results: List[ExternalSearchResult],
+        context: PipelineContext = None
     ) -> AnalysisResult:
         """기술력/보안성 분석 실행"""
-        context = self._create_context_summary(documents, external_results)
+        context_summary = self._create_context_summary(documents, external_results)
         company_info_text = f"업종: {company_info.industry}, 설명: {company_info.description}"
 
         try:
-            response = self.llm.invoke(self.analysis_prompt.format(
+            formatted_prompt = self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
-                context=context
-            ))
+                context=context_summary
+            )
+            
+            response = self.llm.invoke(formatted_prompt)
 
             # GPT 응답을 터미널에 출력
             print(f"\n🔍 {self.analyzer_name.upper()} - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
+
+            # GPT 응답을 컨텍스트에 저장
+            if context:
+                gpt_response = GPTResponse(
+                    layer_name="ANALYSIS_ENGINE",
+                    analyzer_name=self.analyzer_name,
+                    prompt=formatted_prompt,
+                    response=response.content
+                )
+                context.gpt_responses.append(gpt_response)
 
             import json
             result_data = json.loads(response.content.strip())
@@ -360,24 +400,37 @@ JSON 형식으로 응답해주세요:
         self,
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
-        external_results: List[ExternalSearchResult]
+        external_results: List[ExternalSearchResult],
+        context: PipelineContext = None
     ) -> AnalysisResult:
         """재무건전성 분석 실행"""
-        context = self._create_context_summary(documents, external_results)
+        context_summary = self._create_context_summary(documents, external_results)
         company_info_text = f"업종: {company_info.industry}, 설립년도: {company_info.founded_year}"
 
         try:
-            response = self.llm.invoke(self.analysis_prompt.format(
+            formatted_prompt = self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
-                context=context
-            ))
+                context=context_summary
+            )
+            
+            response = self.llm.invoke(formatted_prompt)
 
             # GPT 응답을 터미널에 출력
             print(f"\n🔍 {self.analyzer_name.upper()} - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
+
+            # GPT 응답을 컨텍스트에 저장
+            if context:
+                gpt_response = GPTResponse(
+                    layer_name="ANALYSIS_ENGINE",
+                    analyzer_name=self.analyzer_name,
+                    prompt=formatted_prompt,
+                    response=response.content
+                )
+                context.gpt_responses.append(gpt_response)
 
             import json
             result_data = json.loads(response.content.strip())
@@ -424,7 +477,8 @@ class AnalysisEngine:
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
-        selected_analyses: List[str] = None
+        selected_analyses: List[str] = None,
+        context: PipelineContext = None
     ) -> List[AnalysisResult]:
         """병렬로 분석 실행"""
 
@@ -441,7 +495,7 @@ class AnalysisEngine:
         with ThreadPoolExecutor(max_workers=len(selected_analyzers)) as executor:
             future_to_analyzer = {
                 executor.submit(
-                    analyzer.analyze, company_info, documents, external_results
+                    analyzer.analyze, company_info, documents, external_results, context
                 ): name
                 for name, analyzer in selected_analyzers.items()
             }
@@ -498,7 +552,8 @@ def process_analysis_engine(context: PipelineContext) -> PipelineContext:
         company_info=context.company_info,
         documents=context.retrieved_documents,
         external_results=context.external_search_results,
-        selected_analyses=selected_analyses
+        selected_analyses=selected_analyses,
+        context=context
     )
 
     context.analysis_results = analysis_results

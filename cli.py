@@ -21,10 +21,10 @@ def cli():
 @cli.command()
 @click.argument('company_query')
 @click.option('--format', '-f', default='console',
-              type=click.Choice(['console', 'json', 'summary']),
+              type=click.Choice(['console', 'json', 'summary', 'pdf', 'word']),
               help='출력 형식')
 @click.option('--save', '-s', is_flag=True, help='파일로 저장')
-@click.option('--output', '-o', help='출력 파일 경로')
+@click.option('--output', '-o', help='출력 파일 경로 (확장자에 따라 자동 포맷 결정)')
 @click.option('--skip-external', is_flag=True, help='외부 검색 건너뛰기')
 @click.option('--retries', default=1, help='최대 재시도 횟수')
 @click.option('--verbose', '-v', is_flag=True, help='상세 로그 출력')
@@ -34,7 +34,8 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
     예시:
         투자평가 "토스의 투자 가치를 평가해줘"
         투자평가 "카카오 성장성 분석" --format json
-        투자평가 "배달의민족 리스크 분석" --save --output report.json
+        투자평가 "배달의민족 리스크 분석" --save --output report.pdf
+        투자평가 "네이버 전체 평가" --format word --save --output report.docx
     """
 
     # 로깅 레벨 설정

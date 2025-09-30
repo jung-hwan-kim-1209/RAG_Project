@@ -127,6 +127,15 @@ class QualityCheckResult:
     suggestions: List[str] = field(default_factory=list)
 
 @dataclass
+class GPTResponse:
+    """GPT 응답 로깅용 데이터 클래스"""
+    layer_name: str
+    analyzer_name: str
+    prompt: str
+    response: str
+    timestamp: datetime = field(default_factory=datetime.now)
+
+@dataclass
 class PipelineContext:
     """파이프라인 실행 컨텍스트"""
     parsed_input: ParsedInput
@@ -138,6 +147,9 @@ class PipelineContext:
     unicorn_score: Optional[UnicornScore] = None
     final_report: Optional[InvestmentReport] = None
     quality_check: Optional[QualityCheckResult] = None
+
+    # GPT 응답 로깅
+    gpt_responses: List[GPTResponse] = field(default_factory=list)
 
     # 실행 메타데이터
     execution_start_time: datetime = field(default_factory=datetime.now)

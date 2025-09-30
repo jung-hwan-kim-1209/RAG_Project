@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import (
     RiskAssessment, RiskLevel, DocumentChunk, ExternalSearchResult,
-    PipelineContext, CompanyInfo, AnalysisResult
+    PipelineContext, CompanyInfo, AnalysisResult, GPTResponse
 )
 from config import get_config
 
@@ -34,7 +34,8 @@ class BaseRiskEvaluator:
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
+        analysis_results: List[AnalysisResult],
+        context: PipelineContext = None
     ) -> RiskAssessment:
         """리스크 평가 실행 (하위 클래스에서 구현)"""
         raise NotImplementedError
@@ -124,23 +125,36 @@ JSON 형식으로 응답해주세요:
         company_info: CompanyInfo,
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
-        analysis_results: List[AnalysisResult]
+        analysis_results: List[AnalysisResult],
+        context: PipelineContext = None
     ) -> RiskAssessment:
         """시장 리스크 평가 실행"""
-        context = self._create_analysis_context(documents, external_results, analysis_results)
+        context_summary = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm.invoke(self.evaluation_prompt.format(
+            formatted_prompt = self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
-                context=context
-            ))
+                context=context_summary
+            )
+            
+            response = self.llm.invoke(formatted_prompt)
 
             # GPT 응답을 터미널에 출력
             print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
+
+            # GPT 응답을 컨텍스트에 저장
+            if context:
+                gpt_response = GPTResponse(
+                    layer_name="RISK_ASSESSMENT_LAYER",
+                    analyzer_name=self.risk_category,
+                    prompt=formatted_prompt,
+                    response=response.content
+                )
+                context.gpt_responses.append(gpt_response)
 
             import json
             risk_data = json.loads(response.content.strip())
@@ -581,7 +595,8 @@ class RiskEvaluator:
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult],
         analysis_results: List[AnalysisResult],
-        selected_risks: List[str] = None
+        selected_risks: List[str] = None,
+        context: PipelineContext = None
     ) -> List[RiskAssessment]:
         """모든 리스크 평가 실행 (병렬)"""
 
@@ -599,7 +614,7 @@ class RiskEvaluator:
             future_to_evaluator = {
                 executor.submit(
                     evaluator.evaluate,
-                    company_info, documents, external_results, analysis_results
+                    company_info, documents, external_results, analysis_results, context
                 ): name
                 for name, evaluator in selected_evaluators.items()
             }
@@ -753,7 +768,8 @@ def process_risk_assessment_layer(context: PipelineContext) -> PipelineContext:
         company_info=context.company_info,
         documents=context.retrieved_documents,
         external_results=context.external_search_results,
-        analysis_results=context.analysis_results
+        analysis_results=context.analysis_results,
+        context=context
     )
 
     context.risk_assessments = risk_assessments
