@@ -44,8 +44,8 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
 
     # API 키 확인
     if not os.getenv("OPENAI_API_KEY"):
-        click.echo("❌ OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.", err=True)
-        click.echo("💡 .env 파일에 OPENAI_API_KEY=your_api_key 를 설정해주세요.", err=True)
+        click.echo("[오류] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.", err=True)
+        click.echo("[정보] .env 파일에 OPENAI_API_KEY=your_api_key 를 설정해주세요.", err=True)
         return
 
     try:
@@ -67,7 +67,7 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
             click.echo(f"💾 리포트가 {output}에 저장되었습니다.")
 
     except Exception as e:
-        click.echo(f"❌ 오류 발생: {str(e)}", err=True)
+        click.echo(f"[오류] 오류 발생: {str(e)}", err=True)
         if verbose:
             import traceback
             click.echo(traceback.format_exc(), err=True)
@@ -95,19 +95,19 @@ def setup(data_dir):
 
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
-            click.echo(f"📁 디렉토리 생성: {directory}")
+            click.echo(f"[생성] 디렉토리 생성: {directory}")
 
         # Vector DB 초기화
-        click.echo("🗄️ Vector Database 초기화 중...")
+        click.echo("Vector Database 초기화 중...")
         knowledge_base = create_knowledge_base_layer()
         knowledge_base.setup_database()
 
-        click.echo("✅ 초기 설정 완료!")
+        click.echo("[완료] 초기 설정 완료!")
         click.echo(f"📋 데이터 디렉토리: {data_path.absolute()}")
-        click.echo("💡 문서들을 해당 디렉토리에 추가한 후 사용하세요.")
+        click.echo("[정보] 문서들을 해당 디렉토리에 추가한 후 사용하세요.")
 
     except Exception as e:
-        click.echo(f"❌ 설정 오류: {str(e)}", err=True)
+        click.echo(f"[오류] 설정 오류: {str(e)}", err=True)
 
 @cli.command()
 @click.argument('documents_path')
@@ -126,12 +126,12 @@ def add_documents(documents_path, doc_type):
         if documents:
             knowledge_base.vector_db_manager.add_documents_to_chroma(documents)
             knowledge_base.vector_db_manager.add_documents_to_faiss(documents)
-            click.echo(f"✅ {len(documents)}개 문서가 추가되었습니다.")
+            click.echo(f"[완료] {len(documents)}개 문서가 추가되었습니다.")
         else:
-            click.echo("⚠️ 추가할 문서를 찾을 수 없습니다.")
+            click.echo("[경고] 추가할 문서를 찾을 수 없습니다.")
 
     except Exception as e:
-        click.echo(f"❌ 문서 추가 오류: {str(e)}", err=True)
+        click.echo(f"[오류] 문서 추가 오류: {str(e)}", err=True)
 
 @cli.command()
 @click.argument('company_name')
@@ -147,7 +147,7 @@ def search(company_name, top_k):
             k=top_k
         )
 
-        click.echo(f"🔍 {company_name} 관련 문서 {len(results)}개 발견:")
+        click.echo(f"[검색] {company_name} 관련 문서 {len(results)}개 발견:")
 
         for i, result in enumerate(results, 1):
             click.echo(f"\n{i}. {result.source}")
@@ -155,7 +155,7 @@ def search(company_name, top_k):
             click.echo(f"   내용: {result.content[:100]}...")
 
     except Exception as e:
-        click.echo(f"❌ 검색 오류: {str(e)}", err=True)
+        click.echo(f"[오류] 검색 오류: {str(e)}", err=True)
 
 @cli.command()
 @click.argument('company_query')
@@ -175,16 +175,16 @@ def quick(company_query):
         click.echo(result)
 
     except Exception as e:
-        click.echo(f"❌ 오류 발생: {str(e)}", err=True)
+        click.echo(f"[오류] 오류 발생: {str(e)}", err=True)
 
 @cli.command()
 def status():
     """시스템 상태 확인"""
 
-    click.echo("🔍 시스템 상태 확인 중...")
+    click.echo("시스템 상태 확인 중...")
 
     # API 키 확인
-    api_key_status = "✅ 설정됨" if os.getenv("OPENAI_API_KEY") else "❌ 미설정"
+    api_key_status = "[설정됨]" if os.getenv("OPENAI_API_KEY") else "[미설정]"
     click.echo(f"OpenAI API Key: {api_key_status}")
 
     # 데이터 디렉토리 확인
@@ -197,9 +197,9 @@ def status():
         "./data/faiss_index"
     ]
 
-    click.echo("\n📁 데이터 디렉토리:")
+    click.echo("\n[상태] 데이터 디렉토리:")
     for directory in data_dirs:
-        exists = "✅" if Path(directory).exists() else "❌"
+        exists = "[존재]" if Path(directory).exists() else "[누락]"
         click.echo(f"  {exists} {directory}")
 
     # Vector DB 상태 확인
@@ -209,12 +209,12 @@ def status():
         # ChromaDB 문서 수 확인
         if knowledge_base.vector_db_manager.chroma_db:
             chroma_count = knowledge_base.vector_db_manager.chroma_db._collection.count()
-            click.echo(f"\n🗄️ ChromaDB: {chroma_count}개 문서")
+            click.echo(f"\n[데이터베이스] ChromaDB: {chroma_count}개 문서")
         else:
-            click.echo(f"\n🗄️ ChromaDB: 초기화되지 않음")
+            click.echo(f"\n[데이터베이스] ChromaDB: 초기화되지 않음")
 
     except Exception as e:
-        click.echo(f"\n❌ Vector DB 상태 확인 오류: {e}")
+        click.echo(f"\n[오류] Vector DB 상태 확인 오류: {e}")
 
 @cli.command()
 def config():
@@ -225,14 +225,14 @@ def config():
 
     config_data = get_config()
 
-    click.echo("⚙️ 현재 설정:")
+    click.echo("[설정] 현재 설정:")
     click.echo(f"모델: {config_data['model'].model_name}")
     click.echo(f"Temperature: {config_data['model'].temperature}")
     click.echo(f"Vector DB: ChromaDB + FAISS")
     click.echo(f"임베딩 모델: {config_data['vector_db'].embedding_model}")
     click.echo(f"Top-K 결과: {config_data['vector_db'].top_k_results}")
 
-    click.echo("\n📊 분석 가중치:")
+    click.echo("\n[설정] 분석 가중치:")
     weights = config_data['analysis_weights']
     click.echo(f"  성장성: {weights.growth_weight:.0%}")
     click.echo(f"  비즈니스모델: {weights.business_model_weight:.0%}")
@@ -271,7 +271,7 @@ def demo():
                     break
 
             except Exception as e:
-                click.echo(f"❌ 데모 실행 오류: {e}")
+                click.echo(f"[오류] 데모 실행 오류: {e}")
 
 if __name__ == '__main__':
     cli()

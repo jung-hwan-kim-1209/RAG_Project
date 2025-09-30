@@ -4,8 +4,8 @@ unicorn_score_calculator를 실행하여 총점, 등급, 유니콘 확률을 계
 """
 import math
 from typing import List, Dict, Any, Optional
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
 
 from models import AnalysisResult, UnicornScore, PipelineContext, CompanyInfo
 from config import get_config

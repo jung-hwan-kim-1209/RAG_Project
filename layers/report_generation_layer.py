@@ -4,8 +4,8 @@ unicorn_report_generator를 실행하여 최종 투자 평가 리포트를 생�
 """
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
 
 from models import (
     InvestmentReport, InvestmentRecommendation, UnicornScore,

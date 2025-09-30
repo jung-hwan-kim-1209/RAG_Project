@@ -4,8 +4,8 @@ company_document_retriever 실행하여 관련 문서 청크를 추출하는 레
 """
 import re
 from typing import List, Dict, Any, Optional
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
 
 from models import DocumentChunk, PipelineContext, EvaluationType
 from config import get_config

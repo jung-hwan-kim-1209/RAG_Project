@@ -4,8 +4,8 @@ risk_evaluator를 실행하여 시장, 규제, 경쟁, 재무 리스크를 평�
 """
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
 
 from models import (
     RiskAssessment, RiskLevel, DocumentChunk, ExternalSearchResult,

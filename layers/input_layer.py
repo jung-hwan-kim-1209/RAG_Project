@@ -4,8 +4,8 @@ Layer 1: INPUT LAYER
 """
 import re
 from typing import List, Optional
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
 from models import ParsedInput, EvaluationType, CompanyInfo, PipelineContext
 from config import get_config
 

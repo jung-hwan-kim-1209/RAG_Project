@@ -7,10 +7,11 @@ import logging
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
-from langchain.embeddings import SentenceTransformerEmbeddings
-from langchain.vectorstores import Chroma, FAISS
-from langchain.document_loaders import PyPDFLoader, TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from models import DocumentChunk, PipelineContext
 from config import get_config
