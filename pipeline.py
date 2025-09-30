@@ -3,6 +3,7 @@ AI 스타트업 투자 평가 에이전트 메인 파이프라인
 10개 레이어를 순차적으로 실행하는 파이프라인
 """
 import logging
+import os
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -46,13 +47,18 @@ class InvestmentEvaluationPipeline:
     def execute_pipeline(
         self,
         user_input: str,
-        output_format: str = "console",
+        output_format: str = None,
         save_to_file: bool = False,
         output_path: str = None,
         skip_external_search: bool = False,
-        max_retries: int = 1
+        max_retries: int = None
     ) -> str:
         """파이프라인 실행"""
+
+        if output_format is None:
+            output_format = os.getenv("DEFAULT_OUTPUT_FORMAT", "console")
+        if max_retries is None:
+            max_retries = int(os.getenv("MAX_RETRIES", "1"))
 
         logger.info(f"파이프라인 실행 시작: {user_input}")
 
@@ -209,12 +215,15 @@ def create_pipeline() -> InvestmentEvaluationPipeline:
 
 def run_investment_evaluation(
     user_input: str,
-    output_format: str = "console",
+    output_format: str = None,
     save_to_file: bool = False,
     output_path: str = None,
     **kwargs
 ) -> str:
     """투자 평가 실행 함수 (외부 API)"""
+    if output_format is None:
+        output_format = os.getenv("DEFAULT_OUTPUT_FORMAT", "console")
+    
     pipeline = create_pipeline()
     return pipeline.execute_pipeline(
         user_input=user_input,

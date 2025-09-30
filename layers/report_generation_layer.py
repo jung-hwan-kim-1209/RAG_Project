@@ -2,10 +2,15 @@
 Layer 8: REPORT GENERATION LAYER
 unicorn_report_generator를 실행하여 최종 투자 평가 리포트를 생성하는 레이어
 """
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import (
     InvestmentReport, InvestmentRecommendation, UnicornScore,
@@ -19,10 +24,10 @@ class UnicornReportGenerator:
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
-            temperature=self.config["model"].temperature,
-            model_name=self.config["model"].model_name
+            temperature=0.1,
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
         # Executive Summary 생성 프롬프트
@@ -119,14 +124,14 @@ Executive Summary는 다음 구조로 작성해주세요:
     ) -> str:
         """Executive Summary 생성"""
         try:
-            response = self.llm(self.executive_summary_prompt.format(
+            response = self.llm.invoke(self.executive_summary_prompt.format(
                 company_name=company_info.name,
                 total_score=unicorn_score.total_score,
                 grade=unicorn_score.grade,
                 unicorn_probability=unicorn_score.unicorn_probability,
                 recommendation=recommendation.value
             ))
-            return response.strip()
+            return response.content.strip()
         except Exception as e:
             return f"Executive Summary 생성 오류: {str(e)}"
 
@@ -157,12 +162,12 @@ Executive Summary는 다음 구조로 작성해주세요:
                     f"완화 전략: {', '.join(risk.mitigation_strategies)}\n"
                 )
 
-            response = self.llm(self.detailed_analysis_prompt.format(
+            response = self.llm.invoke(self.detailed_analysis_prompt.format(
                 company_name=company_info.name,
                 analysis_results="\n".join(analysis_text),
                 risk_assessments="\n".join(risk_text)
             ))
-            return response.strip()
+            return response.content.strip()
         except Exception as e:
             return f"상세 분석 생성 오류: {str(e)}"
 
@@ -177,13 +182,13 @@ Executive Summary는 다음 구조로 작성해주세요:
             key_factors = unicorn_score.score_breakdown.get("unicorn_factors", [])
             key_factors_text = ", ".join(key_factors) if key_factors else "종합 분석 결과"
 
-            response = self.llm(self.investment_rationale_prompt.format(
+            response = self.llm.invoke(self.investment_rationale_prompt.format(
                 company_name=company_info.name,
                 recommendation=recommendation.value,
                 unicorn_score=f"{unicorn_score.total_score:.1f}점 ({unicorn_score.grade}급)",
                 key_factors=key_factors_text
             ))
-            return response.strip()
+            return response.content.strip()
         except Exception as e:
             return f"투자 근거 생성 오류: {str(e)}"
 
@@ -234,15 +239,18 @@ Executive Summary는 다음 구조로 작성해주세요:
         confidence_factors = []
 
         # 데이터 양 기반 신뢰도
-        data_confidence = min(len(documents) + len(external_results), 20) / 20.0
+        max_data_sources = int(os.getenv("MAX_DATA_SOURCES_FOR_CONFIDENCE", "20"))
+        data_confidence = min(len(documents) + len(external_results), max_data_sources) / max_data_sources
         confidence_factors.append(data_confidence)
 
         # 분석 완성도 기반 신뢰도
-        analysis_confidence = len(analysis_results) / 7.0  # 7개 분석 영역
+        max_analysis_areas = int(os.getenv("MAX_ANALYSIS_AREAS", "7"))
+        analysis_confidence = len(analysis_results) / max_analysis_areas
         confidence_factors.append(analysis_confidence)
 
         # 리스크 평가 완성도
-        risk_confidence = len(risk_assessments) / 6.0  # 6개 리스크 카테고리
+        max_risk_categories = int(os.getenv("MAX_RISK_CATEGORIES", "6"))
+        risk_confidence = len(risk_assessments) / max_risk_categories
         confidence_factors.append(risk_confidence)
 
         # 평균 신뢰도 계산
@@ -294,11 +302,15 @@ Executive Summary는 다음 구조로 작성해주세요:
 
         # 제한사항 정리
         limitations = []
-        if len(documents) < 5:
+        min_documents = int(os.getenv("MIN_DOCUMENTS_FOR_LIMITATION", "5"))
+        min_external_results = int(os.getenv("MIN_EXTERNAL_RESULTS_FOR_LIMITATION", "3"))
+        min_confidence_level = float(os.getenv("MIN_CONFIDENCE_LEVEL_FOR_LIMITATION", "0.7"))
+        
+        if len(documents) < min_documents:
             limitations.append("제한된 내부 문서 데이터")
-        if len(external_results) < 3:
+        if len(external_results) < min_external_results:
             limitations.append("제한된 외부 검색 결과")
-        if confidence_level < 0.7:
+        if confidence_level < min_confidence_level:
             limitations.append("중간 수준의 분석 신뢰도")
 
         # 최종 리포트 생성

@@ -4,69 +4,73 @@ Configuration settings for AI Startup Investment Evaluation Agent
 import os
 from dataclasses import dataclass
 from typing import Dict, List
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 @dataclass
 class ModelConfig:
     """LLM model configuration"""
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
-    model_name: str = "gpt-4"
-    temperature: float = 0.2
-    max_tokens: int = 2000
+    model_name: str = os.getenv("MODEL_NAME", "gpt-4o")
+    temperature: float = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
+    max_tokens: int = int(os.getenv("MODEL_MAX_TOKENS", "2000"))
 
 @dataclass
 class VectorDBConfig:
     """Vector database configuration"""
-    chroma_persist_directory: str = "./data/chroma_db"
-    faiss_index_path: str = "./data/faiss_index"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    collection_name: str = "startup_docs"
-    top_k_results: int = 10
+    chroma_persist_directory: str = os.getenv("CHROMA_PERSIST_DIRECTORY", "./data/chroma_db")
+    faiss_index_path: str = os.getenv("FAISS_INDEX_PATH", "./data/faiss_index")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+    collection_name: str = os.getenv("COLLECTION_NAME", "startup_docs")
+    top_k_results: int = int(os.getenv("TOP_K_RESULTS", "10"))
 
 @dataclass
 class AnalysisWeights:
     """Scoring weights for different analysis areas"""
-    growth_weight: float = 0.20
-    business_model_weight: float = 0.15
-    tech_security_weight: float = 0.15
-    financial_health_weight: float = 0.15
-    team_weight: float = 0.15
-    regulatory_weight: float = 0.10
-    partnership_weight: float = 0.10
+    growth_weight: float = float(os.getenv("GROWTH_WEIGHT", "0.20"))
+    business_model_weight: float = float(os.getenv("BUSINESS_MODEL_WEIGHT", "0.15"))
+    tech_security_weight: float = float(os.getenv("TECH_SECURITY_WEIGHT", "0.15"))
+    financial_health_weight: float = float(os.getenv("FINANCIAL_HEALTH_WEIGHT", "0.15"))
+    team_weight: float = float(os.getenv("TEAM_WEIGHT", "0.15"))
+    regulatory_weight: float = float(os.getenv("REGULATORY_WEIGHT", "0.10"))
+    partnership_weight: float = float(os.getenv("PARTNERSHIP_WEIGHT", "0.10"))
 
 @dataclass
 class ScoringConfig:
     """Scoring and grading configuration"""
-    max_score: int = 100
+    max_score: int = int(os.getenv("MAX_SCORE", "100"))
     grade_thresholds: Dict[str, int] = None
     unicorn_probability_weights: Dict[str, float] = None
 
     def __post_init__(self):
         if self.grade_thresholds is None:
             self.grade_thresholds = {
-                "S": 90,  # Exceptional
-                "A": 80,  # Strong
-                "B": 70,  # Good
-                "C": 60,  # Average
+                "S": int(os.getenv("GRADE_S_THRESHOLD", "90")),  # Exceptional
+                "A": int(os.getenv("GRADE_A_THRESHOLD", "80")),  # Strong
+                "B": int(os.getenv("GRADE_B_THRESHOLD", "70")),  # Good
+                "C": int(os.getenv("GRADE_C_THRESHOLD", "60")),  # Average
                 "D": 0    # Poor
             }
 
         if self.unicorn_probability_weights is None:
             self.unicorn_probability_weights = {
-                "market_size": 0.25,
-                "growth_rate": 0.20,
-                "technology": 0.15,
-                "team": 0.15,
-                "business_model": 0.15,
-                "funding": 0.10
+                "market_size": float(os.getenv("MARKET_SIZE_WEIGHT", "0.25")),
+                "growth_rate": float(os.getenv("GROWTH_RATE_WEIGHT", "0.20")),
+                "technology": float(os.getenv("TECHNOLOGY_WEIGHT", "0.15")),
+                "team": float(os.getenv("TEAM_WEIGHT_PROBABILITY", "0.15")),
+                "business_model": float(os.getenv("BUSINESS_MODEL_WEIGHT_PROBABILITY", "0.15")),
+                "funding": float(os.getenv("FUNDING_WEIGHT", "0.10"))
             }
 
 @dataclass
 class DocumentPaths:
     """Document storage paths"""
-    ir_documents: str = "./data/documents/ir_reports"
-    market_reports: str = "./data/documents/market_reports"
-    company_profiles: str = "./data/documents/company_profiles"
-    financial_statements: str = "./data/documents/financials"
+    ir_documents: str = os.getenv("IR_DOCUMENTS_PATH", "./data/documents/ir_reports")
+    market_reports: str = os.getenv("MARKET_REPORTS_PATH", "./data/documents/market_reports")
+    company_profiles: str = os.getenv("COMPANY_PROFILES_PATH", "./data/documents/company_profiles")
+    financial_statements: str = os.getenv("FINANCIAL_STATEMENTS_PATH", "./data/documents/financials")
 
 # Global configuration instance
 CONFIG = {

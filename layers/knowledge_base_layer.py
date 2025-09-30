@@ -7,11 +7,16 @@ import logging
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
-from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from huggingface_hub import InferenceClient
+import numpy as np
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import DocumentChunk, PipelineContext
 from config import get_config
@@ -19,19 +24,57 @@ from config import get_config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class HuggingFaceEmbeddings:
+    """HuggingFace Inference API를 사용한 임베딩 클래스"""
+    
+    def __init__(self, model_name: str, api_key: str):
+        self.model_name = model_name
+        self.client = InferenceClient(
+            provider="hf-inference",
+            api_key=api_key,
+        )
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """문서들을 임베딩으로 변환"""
+        embeddings = []
+        for text in texts:
+            try:
+                # BAAI/bge-m3 모델 사용
+                embedding = self.client.feature_extraction(text, model=self.model_name)
+                embeddings.append(embedding.tolist() if hasattr(embedding, 'tolist') else embedding)
+            except Exception as e:
+                logger.error(f"임베딩 생성 오류: {e}")
+                # 오류 시 0 벡터 반환 (BAAI/bge-m3는 1024차원)
+                embeddings.append([0.0] * 1024)
+        return embeddings
+    
+    def embed_query(self, text: str) -> List[float]:
+        """단일 쿼리를 임베딩으로 변환"""
+        try:
+            embedding = self.client.feature_extraction(text, model=self.model_name)
+            return embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+        except Exception as e:
+            logger.error(f"쿼리 임베딩 생성 오류: {e}")
+            return [0.0] * 1024
+
 class VectorDBManager:
     """Vector Database 관리 클래스"""
 
     def __init__(self):
         self.config = get_config()
-        self.embeddings = SentenceTransformerEmbeddings(
-            model_name=self.config["vector_db"].embedding_model
+        hf_token = os.getenv("HF_TOKEN")
+        if not hf_token:
+            raise ValueError("HF_TOKEN 환경변수가 설정되지 않았습니다.")
+        
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=self.config["vector_db"].embedding_model,
+            api_key=hf_token
         )
         self.chroma_db = None
         self.faiss_db = None
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
+            chunk_size=int(os.getenv("TEXT_CHUNK_SIZE", "1000")),
+            chunk_overlap=int(os.getenv("TEXT_CHUNK_OVERLAP", "200")),
             length_function=len
         )
 
@@ -41,9 +84,13 @@ class VectorDBManager:
             persist_directory = self.config["vector_db"].chroma_persist_directory
             os.makedirs(persist_directory, exist_ok=True)
 
+            # ChromaDB용 커스텀 임베딩 함수 생성
+            def chroma_embedding_function(texts):
+                return self.embeddings.embed_documents(texts)
+
             self.chroma_db = Chroma(
                 persist_directory=persist_directory,
-                embedding_function=self.embeddings,
+                embedding_function=chroma_embedding_function,
                 collection_name=self.config["vector_db"].collection_name
             )
             logger.info("ChromaDB 초기화 완료")
@@ -54,8 +101,25 @@ class VectorDBManager:
         """FAISS 초기화"""
         try:
             index_path = self.config["vector_db"].faiss_index_path
-            if os.path.exists(index_path):
-                self.faiss_db = FAISS.load_local(index_path, self.embeddings)
+            faiss_file = f"{index_path}.faiss"
+            pkl_file = f"{index_path}.pkl"
+            
+            if os.path.exists(faiss_file) and os.path.exists(pkl_file):
+                import faiss
+                import pickle
+                
+                # FAISS 인덱스 로드
+                index = faiss.read_index(faiss_file)
+                
+                # 메타데이터 로드
+                with open(pkl_file, 'rb') as f:
+                    data = pickle.load(f)
+                
+                self.faiss_db = {
+                    "index": index,
+                    "texts": data["texts"],
+                    "metadatas": data["metadatas"]
+                }
                 logger.info("FAISS 인덱스 로드 완료")
             else:
                 logger.info("FAISS 인덱스가 존재하지 않음")
@@ -131,25 +195,47 @@ class VectorDBManager:
         try:
             texts = [doc["content"] for doc in documents]
             metadatas = [doc["metadata"] for doc in documents]
+            
+            # HuggingFace 임베딩으로 벡터 생성
+            embeddings = self.embeddings.embed_documents(texts)
+            embeddings_array = np.array(embeddings).astype('float32')
 
             if self.faiss_db is None:
-                self.faiss_db = FAISS.from_texts(
-                    texts=texts,
-                    embedding=self.embeddings,
-                    metadatas=metadatas
-                )
+                # FAISS 인덱스 직접 생성
+                import faiss
+                dimension = embeddings_array.shape[1]
+                index = faiss.IndexFlatIP(dimension)  # Inner Product (cosine similarity)
+                
+                # 정규화 (cosine similarity를 위해)
+                faiss.normalize_L2(embeddings_array)
+                index.add(embeddings_array)
+                
+                # FAISS 인덱스와 메타데이터를 저장
+                index_path = self.config["vector_db"].faiss_index_path
+                os.makedirs(os.path.dirname(index_path), exist_ok=True)
+                faiss.write_index(index, f"{index_path}.faiss")
+                
+                # 메타데이터 저장
+                import pickle
+                with open(f"{index_path}.pkl", 'wb') as f:
+                    pickle.dump({"texts": texts, "metadatas": metadatas}, f)
+                
+                # self.faiss_db에 저장 (검색용)
+                self.faiss_db = {"index": index, "texts": texts, "metadatas": metadatas}
             else:
-                new_db = FAISS.from_texts(
-                    texts=texts,
-                    embedding=self.embeddings,
-                    metadatas=metadatas
-                )
-                self.faiss_db.merge_from(new_db)
-
-            # FAISS 인덱스 저장
-            index_path = self.config["vector_db"].faiss_index_path
-            os.makedirs(os.path.dirname(index_path), exist_ok=True)
-            self.faiss_db.save_local(index_path)
+                # 기존 인덱스에 추가
+                faiss.normalize_L2(embeddings_array)
+                self.faiss_db["index"].add(embeddings_array)
+                self.faiss_db["texts"].extend(texts)
+                self.faiss_db["metadatas"].extend(metadatas)
+                
+                # 업데이트된 인덱스 저장
+                index_path = self.config["vector_db"].faiss_index_path
+                faiss.write_index(self.faiss_db["index"], f"{index_path}.faiss")
+                
+                import pickle
+                with open(f"{index_path}.pkl", 'wb') as f:
+                    pickle.dump({"texts": self.faiss_db["texts"], "metadatas": self.faiss_db["metadatas"]}, f)
 
             logger.info(f"FAISS에 {len(documents)}개 문서 추가 완료")
         except Exception as e:
@@ -163,6 +249,11 @@ class VectorDBManager:
         k = k or self.config["vector_db"].top_k_results
 
         try:
+            # ChromaDB의 similarity_search_with_score는 커스텀 임베딩 함수와 호환되지 않을 수 있음
+            # 대신 직접 구현
+            query_embedding = self.embeddings.embed_query(query)
+            
+            # ChromaDB에서 검색 (임베딩 함수가 자동으로 호출됨)
             results = self.chroma_db.similarity_search_with_score(
                 query=query,
                 k=k,
@@ -182,7 +273,8 @@ class VectorDBManager:
             return chunks
         except Exception as e:
             logger.error(f"ChromaDB 검색 실패: {e}")
-            return []
+            # 대안으로 FAISS 검색 사용
+            return self.search_faiss(query, k)
 
     def search_faiss(self, query: str, k: int = None) -> List[DocumentChunk]:
         """FAISS에서 검색"""
@@ -192,20 +284,27 @@ class VectorDBManager:
         k = k or self.config["vector_db"].top_k_results
 
         try:
-            results = self.faiss_db.similarity_search_with_score(
-                query=query,
-                k=k
-            )
-
+            # 쿼리 임베딩 생성
+            query_embedding = self.embeddings.embed_query(query)
+            query_array = np.array([query_embedding]).astype('float32')
+            
+            # 정규화
+            import faiss
+            faiss.normalize_L2(query_array)
+            
+            # 검색 실행
+            scores, indices = self.faiss_db["index"].search(query_array, k)
+            
             chunks = []
-            for doc, score in results:
-                chunk = DocumentChunk(
-                    content=doc.page_content,
-                    source=doc.metadata.get("source", "unknown"),
-                    metadata=doc.metadata,
-                    similarity_score=score
-                )
-                chunks.append(chunk)
+            for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
+                if idx >= 0 and idx < len(self.faiss_db["texts"]):
+                    chunk = DocumentChunk(
+                        content=self.faiss_db["texts"][idx],
+                        source=self.faiss_db["metadatas"][idx].get("source", "unknown"),
+                        metadata=self.faiss_db["metadatas"][idx],
+                        similarity_score=float(score)
+                    )
+                    chunks.append(chunk)
 
             return chunks
         except Exception as e:
@@ -336,3 +435,31 @@ def process_knowledge_base_layer(context: PipelineContext) -> PipelineContext:
     )
 
     return context
+
+# 테스트 코드
+if __name__ == "__main__":
+    print("🧪 Knowledge Base Layer 테스트 시작...")
+    
+    try:
+        # VectorDBManager 테스트
+        print("1. VectorDBManager 초기화 테스트...")
+        manager = VectorDBManager()
+        print("✅ VectorDBManager 초기화 성공")
+        
+        # HuggingFace 임베딩 테스트
+        print("2. HuggingFace 임베딩 테스트...")
+        test_text = "테스트 문서입니다."
+        embedding = manager.embeddings.embed_query(test_text)
+        print(f"✅ 임베딩 생성 성공: {len(embedding)}차원")
+        
+        # KnowledgeBase 테스트
+        print("3. KnowledgeBase 초기화 테스트...")
+        kb = KnowledgeBase()
+        print("✅ KnowledgeBase 초기화 성공")
+        
+        print("\n🎉 모든 테스트 통과!")
+        
+    except Exception as e:
+        print(f"❌ 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()

@@ -8,6 +8,10 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from models import InvestmentReport, QualityCheckResult, PipelineContext
 from layers.report_generation_layer import ReportFormatter
 

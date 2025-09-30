@@ -3,10 +3,15 @@ Layer 5: ANALYSIS ENGINE
 7개 분석 영역을 병렬로 실행하는 레이어
 """
 import asyncio
+import os
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import AnalysisResult, DocumentChunk, ExternalSearchResult, PipelineContext, CompanyInfo
 from config import get_config
@@ -17,10 +22,10 @@ class BaseAnalyzer:
     def __init__(self, analyzer_name: str):
         self.analyzer_name = analyzer_name
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
-            temperature=self.config["model"].temperature,
-            model_name=self.config["model"].model_name
+            temperature=0.1,
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
     def analyze(
@@ -115,7 +120,7 @@ JSON 형식으로 응답해주세요:
         company_info_text = f"업종: {company_info.industry}, 설립년도: {company_info.founded_year}, 본사: {company_info.headquarters}"
 
         try:
-            response = self.llm(self.analysis_prompt.format(
+            response = self.llm.invoke(self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
                 context=context
@@ -192,7 +197,7 @@ JSON 형식으로 응답해주세요:
         company_info_text = f"업종: {company_info.industry}, 설명: {company_info.description}"
 
         try:
-            response = self.llm(self.analysis_prompt.format(
+            response = self.llm.invoke(self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
                 context=context
@@ -268,7 +273,7 @@ JSON 형식으로 응답해주세요:
         company_info_text = f"업종: {company_info.industry}, 설명: {company_info.description}"
 
         try:
-            response = self.llm(self.analysis_prompt.format(
+            response = self.llm.invoke(self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
                 context=context
@@ -344,7 +349,7 @@ JSON 형식으로 응답해주세요:
         company_info_text = f"업종: {company_info.industry}, 설립년도: {company_info.founded_year}"
 
         try:
-            response = self.llm(self.analysis_prompt.format(
+            response = self.llm.invoke(self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
                 context=context
@@ -420,7 +425,7 @@ JSON 형식으로 응답해주세요:
         company_info_text = f"업종: {company_info.industry}, 직원수: {company_info.employee_count}"
 
         try:
-            response = self.llm(self.analysis_prompt.format(
+            response = self.llm.invoke(self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
                 context=context
@@ -496,7 +501,7 @@ JSON 형식으로 응답해주세요:
         company_info_text = f"업종: {company_info.industry}, 본사: {company_info.headquarters}"
 
         try:
-            response = self.llm(self.analysis_prompt.format(
+            response = self.llm.invoke(self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
                 context=context
@@ -572,7 +577,7 @@ JSON 형식으로 응답해주세요:
         company_info_text = f"업종: {company_info.industry}, 설명: {company_info.description}"
 
         try:
-            response = self.llm(self.analysis_prompt.format(
+            response = self.llm.invoke(self.analysis_prompt.format(
                 company_name=company_info.name,
                 company_info=company_info_text,
                 context=context
@@ -648,7 +653,8 @@ class AnalysisEngine:
             results = []
             for future in future_to_analyzer:
                 try:
-                    result = future.result(timeout=60)  # 60초 타임아웃
+                    timeout_seconds = int(os.getenv("ANALYSIS_TIMEOUT_SECONDS", "60"))
+                    result = future.result(timeout=timeout_seconds)
                     results.append(result)
                 except Exception as e:
                     analyzer_name = future_to_analyzer[future]

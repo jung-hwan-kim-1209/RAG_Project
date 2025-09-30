@@ -4,8 +4,14 @@ Layer 1: INPUT LAYER
 """
 import re
 from typing import List, Optional
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
+
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from models import ParsedInput, EvaluationType, CompanyInfo, PipelineContext
 from config import get_config
 
@@ -14,10 +20,10 @@ class InputParser:
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
         self.parsing_prompt = PromptTemplate(
@@ -46,11 +52,11 @@ class InputParser:
         """사용자 입력을 파싱하여 구조화된 데이터로 변환"""
         try:
             # LLM을 통한 입력 파싱
-            response = self.llm(self.parsing_prompt.format(user_input=user_input))
+            response = self.llm.invoke(self.parsing_prompt.format(user_input=user_input))
 
             # JSON 응답 파싱
             import json
-            parsed_data = json.loads(response.strip())
+            parsed_data = json.loads(response.content.strip())
 
             # 평가 유형 매핑
             evaluation_type_map = {
@@ -80,11 +86,11 @@ class InputParser:
     def _fallback_parsing(self, user_input: str) -> ParsedInput:
         """LLM 파싱 실패 시 규칙 기반 백업 파싱"""
 
-        # 기업명 추출 패턴
+        # 기업명 추출 패턴 (더 구체적인 패턴부터 우선순위 적용)
         company_patterns = [
-            r'([가-힣A-Za-z0-9]+)(?:의|을|를)?\s*(?:투자|평가|분석)',
-            r'([가-힣A-Za-z0-9]+)\s*(?:회사|기업)',
-            r'([가-힣A-Za-z0-9]+)(?:\s|$)'
+            r'^([가-힣A-Za-z0-9]+)(?:의|을|를)?\s*(?:투자|평가|분석)',
+            r'^([가-힣A-Za-z0-9]+)\s*(?:회사|기업)',
+            r'^([가-힣A-Za-z0-9]+)(?:\s|$)'
         ]
 
         company_name = ""
