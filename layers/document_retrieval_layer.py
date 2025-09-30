@@ -16,7 +16,6 @@ class CompanyDocumentRetriever:
     def __init__(self):
         self.config = get_config()
         self.llm = OpenAI(
-            openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
             model_name="gpt-3.5-turbo-instruct"
         )

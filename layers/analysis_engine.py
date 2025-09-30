@@ -18,7 +18,6 @@ class BaseAnalyzer:
         self.analyzer_name = analyzer_name
         self.config = get_config()
         self.llm = OpenAI(
-            openai_api_key=self.config["model"].openai_api_key,
             temperature=self.config["model"].temperature,
             model_name=self.config["model"].model_name
         )

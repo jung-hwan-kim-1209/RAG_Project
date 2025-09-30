@@ -18,9 +18,16 @@ class VectorDBConfig:
     """Vector database configuration"""
     chroma_persist_directory: str = "./data/chroma_db"
     faiss_index_path: str = "./data/faiss_index"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_model: str = os.getenv(
+        "EMBEDDING_MODEL_NAME",
+        "sentence-transformers/all-MiniLM-L6-v2"
+    )
     collection_name: str = "startup_docs"
     top_k_results: int = 10
+    huggingfacehub_api_token: str = os.getenv(
+        "HUGGINGFACEHUB_API_TOKEN",
+        os.getenv("HF_TOKEN", "")
+    )
 
 @dataclass
 class AnalysisWeights:

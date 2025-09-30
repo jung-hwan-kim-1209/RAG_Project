@@ -18,7 +18,6 @@ class UnicornScoreCalculator:
         self.analysis_weights = self.config["analysis_weights"]
         self.scoring_config = self.config["scoring"]
         self.llm = OpenAI(
-            openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
             model_name="gpt-3.5-turbo-instruct"
         )

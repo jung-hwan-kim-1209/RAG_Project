@@ -121,12 +121,26 @@ def add_documents(documents_path, doc_type):
 
     try:
         knowledge_base = create_knowledge_base_layer()
+        stats_before = knowledge_base.vector_db_manager.get_store_stats()
         documents = knowledge_base.vector_db_manager.load_documents_from_directory(documents_path)
 
         if documents:
             knowledge_base.vector_db_manager.add_documents_to_chroma(documents)
             knowledge_base.vector_db_manager.add_documents_to_faiss(documents)
-            click.echo(f"✅ {len(documents)}개 문서가 추가되었습니다.")
+
+            stats_after = knowledge_base.vector_db_manager.get_store_stats()
+            chroma_delta = stats_after.get("chroma_documents", 0) - stats_before.get("chroma_documents", 0)
+            faiss_delta = stats_after.get("faiss_vectors", 0) - stats_before.get("faiss_vectors", 0)
+
+            click.echo(f"✅ {len(documents)}개 문서 청크가 추가되었습니다.")
+            click.echo(
+                f"   - Chroma 문서 수: {stats_after.get('chroma_documents', 0)}"
+                f" (변화: +{max(chroma_delta, 0)})"
+            )
+            click.echo(
+                f"   - FAISS 벡터 수: {stats_after.get('faiss_vectors', 0)}"
+                f" (변화: +{max(faiss_delta, 0)})"
+            )
         else:
             click.echo("⚠️ 추가할 문서를 찾을 수 없습니다.")
 

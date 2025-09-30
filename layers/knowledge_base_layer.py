@@ -23,6 +23,9 @@ class VectorDBManager:
 
     def __init__(self):
         self.config = get_config()
+        token = self.config["vector_db"].huggingfacehub_api_token
+        if token:
+            os.environ.setdefault("HUGGINGFACEHUB_API_TOKEN", token)
         self.embeddings = SentenceTransformerEmbeddings(
             model_name=self.config["vector_db"].embedding_model
         )
@@ -33,6 +36,33 @@ class VectorDBManager:
             chunk_overlap=200,
             length_function=len
         )
+
+    def get_store_stats(self) -> Dict[str, int]:
+        """현재 Vector DB 상태 통계 반환"""
+        stats = {
+            "chroma_documents": 0,
+            "faiss_vectors": 0
+        }
+
+        # Chroma 문서 수 확인
+        try:
+            if not self.chroma_db:
+                self.initialize_chroma()
+            if self.chroma_db:
+                stats["chroma_documents"] = self.chroma_db._collection.count()
+        except Exception as e:
+            logger.warning(f"Chroma 상태 확인 실패: {e}")
+
+        # FAISS 벡터 수 확인
+        try:
+            if self.faiss_db is None:
+                self.initialize_faiss()
+            if self.faiss_db and getattr(self.faiss_db, "index", None):
+                stats["faiss_vectors"] = getattr(self.faiss_db.index, "ntotal", 0)
+        except Exception as e:
+            logger.warning(f"FAISS 상태 확인 실패: {e}")
+
+        return stats
 
     def initialize_chroma(self) -> None:
         """ChromaDB 초기화"""
