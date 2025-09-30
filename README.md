@@ -26,8 +26,7 @@
 | **LLM** | GPT-4o via OpenAI API |
 | **Embeddings** | BAAI/bge-m3 via HuggingFace |
 | **Vector DB** | FAISS, ChromaDB |
-| **External APIs** | Naver News API, SERPAPI |
-| **CLI** | Click |
+| **External APIs** | Naver News API |
 | **Testing** | unittest, pytest |
 
 ## Architecture
@@ -235,36 +234,14 @@ result = run_investment_evaluation(
 • 경쟁 리스크: 낮음
 • 기술 리스크: 낮음
 
-💡 투자 근거
-토스는 한국 핀테크 시장의 선도 기업으로...
-```
 
-## Testing
-
-```bash
-# 전체 테스트 실행
-python -m pytest test_pipeline.py -v
-
-# 특정 테스트 실행
-python test_pipeline.py
-
-# 커버리지 확인
-python -m pytest --cov=. test_pipeline.py
-```
 
 ## Performance
 
 - **처리 시간**: 평균 2-3분 (외부 검색 포함)
 - **정확도**: 85% 이상 (품질 검증 기준)
 - **동시 처리**: 최대 4개 분석기 병렬 실행
-- **메모리 사용량**: 약 2GB (임베딩 모델 포함)
 
-## Limitations
-
-- 외부 API 의존성 (네이버, SERPAPI)
-- 한국어 중심 분석
-- PDF 문서 품질에 따른 정보 추출 한계
-- 실시간 데이터 업데이트 지연
 
 ## Future Improvements
 
@@ -283,23 +260,6 @@ python -m pytest --cov=. test_pipeline.py
 4. Push to the branch
 5. Create a Pull Request
 
-## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contributors
-
-- **김철수**: Prompt Engineering, Agent Design, Analysis Framework
-- **최영희**: PDF Parsing, Retrieval System, Vector Database Integration
-- **박민수**: External API Integration, Quality Assurance
-- **이지영**: CLI Development, Testing Framework
-
-## Contact
-
-- **Project Lead**: 김철수 (kim.cs@example.com)
-- **Technical Issues**: 최영희 (choi.yh@example.com)
-- **Documentation**: 박민수 (park.ms@example.com)
-
----
 
 *이 프로젝트는 교육 및 연구 목적으로 개발되었습니다. 실제 투자 결정에 사용하기 전에 전문가의 조언을 구하시기 바랍니다.*
