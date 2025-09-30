@@ -47,6 +47,11 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
         click.echo("[오류] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.", err=True)
         click.echo("[정보] .env 파일에 OPENAI_API_KEY=your_api_key 를 설정해주세요.", err=True)
         return
+    
+    if not os.getenv("HF_TOKEN"):
+        click.echo("[오류] HF_TOKEN 환경 변수가 설정되지 않았습니다.", err=True)
+        click.echo("[정보] .env 파일에 HF_TOKEN=your_hf_token 를 설정해주세요.", err=True)
+        return
 
     try:
         click.echo(f"🚀 {company_query} 투자 평가를 시작합니다...")
@@ -185,7 +190,9 @@ def status():
 
     # API 키 확인
     api_key_status = "[설정됨]" if os.getenv("OPENAI_API_KEY") else "[미설정]"
+    hf_token_status = "[설정됨]" if os.getenv("HF_TOKEN") else "[미설정]"
     click.echo(f"OpenAI API Key: {api_key_status}")
+    click.echo(f"HuggingFace Token: {hf_token_status}")
 
     # 데이터 디렉토리 확인
     data_dirs = [

@@ -3,9 +3,14 @@ Layer 3: DOCUMENT RETRIEVAL LAYER
 company_document_retriever 실행하여 관련 문서 청크를 추출하는 레이어
 """
 import re
+import os
 from typing import List, Dict, Any, Optional
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import DocumentChunk, PipelineContext, EvaluationType
 from config import get_config
@@ -15,10 +20,10 @@ class CompanyDocumentRetriever:
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
         # 문서 관련성 평가 프롬프트
@@ -166,7 +171,8 @@ class CompanyDocumentRetriever:
 
         # 각 문서에 대해 관련성 점수 계산
         scored_documents = []
-        for doc in documents[:20]:  # LLM 호출 제한을 위해 상위 20개만
+        max_docs_for_llm = int(os.getenv("MAX_DOCS_FOR_LLM", "20"))
+        for doc in documents[:max_docs_for_llm]:  # 환경변수로 설정된 상위 문서만
             try:
                 relevance_data = self._evaluate_document_relevance(
                     doc, company_name, evaluation_type
@@ -179,7 +185,7 @@ class CompanyDocumentRetriever:
                 scored_documents.append(doc)
 
         # 나머지 문서들은 similarity_score 기반으로 추가
-        for doc in documents[20:]:
+        for doc in documents[max_docs_for_llm:]:
             doc.metadata["relevance_score"] = doc.similarity_score * 10
             scored_documents.append(doc)
 
@@ -200,16 +206,17 @@ class CompanyDocumentRetriever:
         """LLM을 사용하여 문서 관련성 평가"""
         try:
             # 문서 내용 제한 (토큰 제한 고려)
-            content_preview = document.content[:1000]
+            max_content_length = int(os.getenv("MAX_DOCUMENT_CONTENT_LENGTH", "1000"))
+            content_preview = document.content[:max_content_length]
 
-            response = self.llm(self.relevance_prompt.format(
+            response = self.llm.invoke(self.relevance_prompt.format(
                 company_name=company_name,
                 evaluation_type=evaluation_type.value,
                 document_content=content_preview
             ))
 
             import json
-            relevance_data = json.loads(response.strip())
+            relevance_data = json.loads(response.content.strip())
             return relevance_data
 
         except Exception as e:

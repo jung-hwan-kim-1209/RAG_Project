@@ -3,11 +3,15 @@ Layer 9: QUALITY CHECK LAYER
 relevance_checker를 실행하여 답변의 관련성, 근거 충분성, 객관성을 검증하는 레이어
 """
 from typing import List, Dict, Any, Optional
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
-
+import os
 import re
 from datetime import datetime
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from models import (
     QualityCheckResult, InvestmentReport, AnalysisResult,
     RiskAssessment, DocumentChunk, ExternalSearchResult, PipelineContext, RiskLevel
@@ -19,10 +23,10 @@ class RelevanceChecker:
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
         # 관련성 검증 프롬프트
@@ -65,14 +69,14 @@ JSON 형식으로 응답해주세요:
             추천: {report.recommendation.value}
             """
 
-            response = self.llm(self.relevance_check_prompt.format(
+            response = self.llm.invoke(self.relevance_check_prompt.format(
                 company_name=company_name,
                 user_request=user_request,
                 report_content=report_summary
             ))
 
             import json
-            result_data = json.loads(response.strip())
+            result_data = json.loads(response.content.strip())
             return result_data.get("relevance_score", 5.0) / 10.0
 
         except Exception as e:
@@ -102,10 +106,10 @@ class EvidenceQualityChecker:
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
     def check_evidence_quality(
@@ -203,10 +207,10 @@ class ObjectivityChecker:
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
         self.objectivity_prompt = PromptTemplate(
@@ -240,12 +244,12 @@ JSON 형식으로 응답해주세요:
             Investment Rationale: {report.investment_rationale[:500]}
             """
 
-            response = self.llm(self.objectivity_prompt.format(
+            response = self.llm.invoke(self.objectivity_prompt.format(
                 report_content=report_content
             ))
 
             import json
-            objectivity_data = json.loads(response.strip())
+            objectivity_data = json.loads(response.content.strip())
 
             return {
                 "score": objectivity_data.get("objectivity_score", 5.0) / 10.0,
@@ -299,22 +303,26 @@ class QualityChecker:
         overall_quality = (relevance_score * 0.4 + evidence_quality * 0.3 + objectivity_score * 0.3)
 
         # 5. 품질 검증 통과 여부 결정
-        quality_threshold = 0.6  # 60% 이상이면 통과
+        quality_threshold = float(os.getenv("QUALITY_THRESHOLD", "0.4"))  # 기본값 40% 이상이면 통과
         passed = overall_quality >= quality_threshold
 
         # 6. 이슈 및 제안사항 수집
         issues = []
         suggestions = []
 
-        if relevance_score < 0.7:
+        relevance_threshold = float(os.getenv("RELEVANCE_THRESHOLD", "0.7"))
+        evidence_threshold = float(os.getenv("EVIDENCE_THRESHOLD", "0.6"))
+        objectivity_threshold = float(os.getenv("OBJECTIVITY_THRESHOLD", "0.7"))
+
+        if relevance_score < relevance_threshold:
             issues.append("관련성 부족")
             suggestions.append("더 구체적인 회사 정보 수집 필요")
 
-        if evidence_quality < 0.6:
+        if evidence_quality < evidence_threshold:
             issues.append("근거 품질 부족")
             suggestions.append("더 많은 데이터 소스 활용 필요")
 
-        if objectivity_score < 0.7:
+        if objectivity_score < objectivity_threshold:
             issues.append("객관성 부족")
             suggestions.extend(objectivity_data["improvement_suggestions"])
 

@@ -5,10 +5,15 @@ web_search_agent를 실행하여 최신 뉴스, 투자유치 정보, 실시간 �
 import asyncio
 import aiohttp
 import requests
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import re
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import ExternalSearchResult, PipelineContext
 from config import get_config
@@ -20,8 +25,10 @@ class WebSearchAgent:
         self.config = get_config()
         self.session = None
 
-    async def search_company_news(self, company_name: str, days_back: int = 30) -> List[ExternalSearchResult]:
+    async def search_company_news(self, company_name: str, days_back: int = None) -> List[ExternalSearchResult]:
         """회사 관련 최신 뉴스 검색"""
+        if days_back is None:
+            days_back = int(os.getenv("NEWS_SEARCH_DAYS_BACK", "30"))
         results = []
 
         # 네이버 뉴스 검색
@@ -387,7 +394,8 @@ class ExternalSearchLayer:
         unique_results = self._deduplicate_results(all_results)
         sorted_results = sorted(unique_results, key=lambda x: x.relevance_score, reverse=True)
 
-        return sorted_results[:20]  # 상위 20개 결과만 반환
+        max_results = int(os.getenv("MAX_EXTERNAL_RESULTS", "20"))
+        return sorted_results[:max_results]  # 환경변수로 설정된 상위 결과만 반환
 
     def _deduplicate_results(self, results: List[ExternalSearchResult]) -> List[ExternalSearchResult]:
         """중복 결과 제거"""

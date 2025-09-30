@@ -3,9 +3,14 @@ Layer 6: SCORING & RANKING ENGINE
 unicorn_score_calculator를 실행하여 총점, 등급, 유니콘 확률을 계산하는 레이어
 """
 import math
+import os
 from typing import List, Dict, Any, Optional
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import AnalysisResult, UnicornScore, PipelineContext, CompanyInfo
 from config import get_config
@@ -17,10 +22,10 @@ class UnicornScoreCalculator:
         self.config = get_config()
         self.analysis_weights = self.config["analysis_weights"]
         self.scoring_config = self.config["scoring"]
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
         # 유니콘 확률 계산 프롬프트
@@ -118,7 +123,7 @@ JSON 형식으로 응답해주세요:
                 for category, score in category_scores.items()
             ])
 
-            response = self.llm(self.unicorn_probability_prompt.format(
+            response = self.llm.invoke(self.unicorn_probability_prompt.format(
                 company_name=company_info.name,
                 total_score=total_score,
                 category_scores=category_scores_text,
@@ -147,7 +152,8 @@ JSON 형식으로 응답해주세요:
         """유니콘 확률 계산 백업 방법 (수학적 모델)"""
 
         # 기본 확률 (총점 기반)
-        base_probability = total_score / 100.0
+        max_score = int(os.getenv("MAX_SCORE", "100"))
+        base_probability = total_score / max_score
 
         # 카테고리별 가중치 적용
         weights = self.scoring_config.unicorn_probability_weights

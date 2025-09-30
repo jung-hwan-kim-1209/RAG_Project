@@ -4,8 +4,12 @@ risk_evaluator를 실행하여 시장, 규제, 경쟁, 재무 리스크를 평�
 """
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import (
     RiskAssessment, RiskLevel, DocumentChunk, ExternalSearchResult,
@@ -19,10 +23,10 @@ class BaseRiskEvaluator:
     def __init__(self, risk_category: str):
         self.risk_category = risk_category
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
-            model_name="gpt-3.5-turbo-instruct"
+            model=self.config["model"].model_name  # 예: "gpt-4o-mini"
         )
 
     def evaluate(
@@ -126,14 +130,14 @@ JSON 형식으로 응답해주세요:
         context = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm(self.evaluation_prompt.format(
+            response = self.llm.invoke(self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
                 context=context
             ))
 
             import json
-            risk_data = json.loads(response.strip())
+            risk_data = json.loads(response.content.strip())
 
             impact_score = risk_data.get("impact_score", 5.0)
             probability = risk_data.get("probability", 0.5)
@@ -199,14 +203,14 @@ JSON 형식으로 응답해주세요:
         context = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm(self.evaluation_prompt.format(
+            response = self.llm.invoke(self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
                 context=context
             ))
 
             import json
-            risk_data = json.loads(response.strip())
+            risk_data = json.loads(response.content.strip())
 
             impact_score = risk_data.get("impact_score", 5.0)
             probability = risk_data.get("probability", 0.5)
@@ -272,14 +276,14 @@ JSON 형식으로 응답해주세요:
         context = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm(self.evaluation_prompt.format(
+            response = self.llm.invoke(self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
                 context=context
             ))
 
             import json
-            risk_data = json.loads(response.strip())
+            risk_data = json.loads(response.content.strip())
 
             impact_score = risk_data.get("impact_score", 5.0)
             probability = risk_data.get("probability", 0.5)
@@ -345,14 +349,14 @@ JSON 형식으로 응답해주세요:
         context = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm(self.evaluation_prompt.format(
+            response = self.llm.invoke(self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
                 context=context
             ))
 
             import json
-            risk_data = json.loads(response.strip())
+            risk_data = json.loads(response.content.strip())
 
             impact_score = risk_data.get("impact_score", 5.0)
             probability = risk_data.get("probability", 0.5)
@@ -418,14 +422,14 @@ JSON 형식으로 응답해주세요:
         context = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm(self.evaluation_prompt.format(
+            response = self.llm.invoke(self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
                 context=context
             ))
 
             import json
-            risk_data = json.loads(response.strip())
+            risk_data = json.loads(response.content.strip())
 
             impact_score = risk_data.get("impact_score", 5.0)
             probability = risk_data.get("probability", 0.5)
@@ -491,14 +495,14 @@ JSON 형식으로 응답해주세요:
         context = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm(self.evaluation_prompt.format(
+            response = self.llm.invoke(self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
                 context=context
             ))
 
             import json
-            risk_data = json.loads(response.strip())
+            risk_data = json.loads(response.content.strip())
 
             impact_score = risk_data.get("impact_score", 5.0)
             probability = risk_data.get("probability", 0.5)
@@ -663,14 +667,14 @@ JSON 형식으로 응답해주세요:
         context = self._create_analysis_context(documents, external_results, analysis_results)
 
         try:
-            response = self.llm(self.evaluation_prompt.format(
+            response = self.llm.invoke(self.evaluation_prompt.format(
                 company_name=company_info.name,
                 industry=company_info.industry,
                 context=context
             ))
 
             import json
-            risk_data = json.loads(response.strip())
+            risk_data = json.loads(response.content.strip())
 
             impact_score = risk_data.get("impact_score", 5.0)
             probability = risk_data.get("probability", 0.5)
