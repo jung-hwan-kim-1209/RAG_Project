@@ -136,6 +136,12 @@ JSON 형식으로 응답해주세요:
                 context=context
             ))
 
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             import json
             risk_data = json.loads(response.content.strip())
 
@@ -208,6 +214,12 @@ JSON 형식으로 응답해주세요:
                 industry=company_info.industry,
                 context=context
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
 
             import json
             risk_data = json.loads(response.content.strip())
@@ -282,6 +294,12 @@ JSON 형식으로 응답해주세요:
                 context=context
             ))
 
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             import json
             risk_data = json.loads(response.content.strip())
 
@@ -354,6 +372,12 @@ JSON 형식으로 응답해주세요:
                 industry=company_info.industry,
                 context=context
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
 
             import json
             risk_data = json.loads(response.content.strip())
@@ -428,6 +452,12 @@ JSON 형식으로 응답해주세요:
                 context=context
             ))
 
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             import json
             risk_data = json.loads(response.content.strip())
 
@@ -500,6 +530,12 @@ JSON 형식으로 응답해주세요:
                 industry=company_info.industry,
                 context=context
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
 
             import json
             risk_data = json.loads(response.content.strip())
@@ -672,6 +708,12 @@ JSON 형식으로 응답해주세요:
                 industry=company_info.industry,
                 context=context
             ))
+
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 RISK_ASSESSMENT_LAYER ({self.risk_category.upper()}) - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
 
             import json
             risk_data = json.loads(response.content.strip())

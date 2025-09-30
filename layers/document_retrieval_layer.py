@@ -215,6 +215,12 @@ class CompanyDocumentRetriever:
                 document_content=content_preview
             ))
 
+            # GPT 응답을 터미널에 출력
+            print(f"\n🔍 DOCUMENT_RETRIEVAL_LAYER - GPT 응답:")
+            print("=" * 60)
+            print(response.content)
+            print("=" * 60)
+
             import json
             relevance_data = json.loads(response.content.strip())
             return relevance_data
