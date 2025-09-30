@@ -32,51 +32,7 @@
 
 ## Architecture
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Input Layer   │───▶│ Knowledge Base  │───▶│ Document        │
-│                 │    │     Layer       │    │ Retrieval       │
-│ • Input Parsing │    │                 │    │ Layer           │
-│ • Company Info  │    │ • FAISS/Chroma  │    │                 │
-└─────────────────┘    │ • Embeddings    │    │ • Filtering     │
-                       └─────────────────┘    │ • Ranking       │
-                                              └─────────────────┘
-                                                       │
-┌─────────────────┐    ┌─────────────────┐           │
-│  Output Layer   │◀───│ Report          │◀──────────┼───┐
-│                 │    │ Generation      │           │   │
-│ • Formatting    │    │                 │           │   │
-│ • File Export   │    │ • Executive     │           │   │
-└─────────────────┘    │   Summary       │           │   │
-                       │ • Investment    │           │   │
-                       │   Rationale     │           │   │
-                       └─────────────────┘           │   │
-                              ▲                      │   │
-                              │                      │   │
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Quality Check   │    │ Scoring Engine  │    │ Analysis Engine │
-│ Layer           │    │                 │    │                 │
-│                 │    │ • Weighted      │    │ • Growth        │
-│ • Relevance     │    │   Scoring       │    │ • Business      │
-│ • Evidence      │    │ • Grade         │    │   Model         │
-│ • Objectivity   │    │   Calculation   │    │ • Tech/Security │
-└─────────────────┘    │ • Unicorn       │    │ • Financial     │
-                       │   Probability   │    └─────────────────┘
-                       └─────────────────┘           ▲
-                              ▲                      │
-                              │                      │
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │ Risk Assessment │    │ External Search │
-                       │ Layer           │    │ Layer           │
-                       │                 │    │                 │
-                       │ • Market Risk   │    │ • News Search   │
-                       │ • Regulatory    │    │ • Investment    │
-                       │ • Competitive   │    │   Info          │
-                       │ • Financial     │    │ • Market        │
-                       │ • Technology    │    │   Indicators    │
-                       │ • Team          │    └─────────────────┘
-                       └─────────────────┘
-```
+<img width="801" height="683" alt="image" src="https://github.com/user-attachments/assets/8dc1a78c-d25e-49bb-a387-4b2a464bf08a" />
 
 ## Directory Structure
 
