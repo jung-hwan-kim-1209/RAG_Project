@@ -1,290 +1,349 @@
-# 🦄 AI 스타트업 투자 평가 에이전트
+# AI Startup Investment Evaluation Agent
 
-한국어 기반 AI 스타트업 투자 가치 평가 시스템입니다. 10단계 파이프라인을 통해 종합적인 투자 분석 리포트를 제공합니다.
+본 프로젝트는 인공지능 스타트업에 대한 투자 가능성을 자동으로 평가하는 에이전트를 설계하고 구현한 실습 프로젝트입니다.
 
-## 🌟 주요 기능
+## Overview
 
-- **지능형 입력 파싱**: 자연어 질의를 구조화된 평가 요청으로 변환
-- **다중 소스 데이터 활용**: Vector DB(ChromaDB/FAISS) + 실시간 웹 검색
-- **7개 영역 병렬 분석**: 성장성, 비즈니스모델, 기술력, 재무건전성, 팀역량, 규제적합성, 제휴네트워크
-- **유니콘 확률 계산**: AI 기반 스타트업 성공 확률 예측
-- **리스크 평가**: 6개 카테고리 리스크 분석 (시장, 규제, 경쟁, 재무, 기술, 팀)
-- **품질 검증**: 관련성, 근거 품질, 객관성 자동 검증
-- **다양한 출력 형식**: 콘솔, JSON, CSV 등 지원
+- **Objective**: AI 스타트업의 기술력, 시장성, 리스크 등을 기준으로 투자 적합성 분석
+- **Method**: Multi-Layer RAG Pipeline + Parallel Analysis Engine
+- **Tools**: LangChain, HuggingFace Embeddings, Vector Databases, External APIs
 
-## 🏗️ 시스템 아키텍처
+## Features
+
+- **📄 PDF 자료 기반 정보 추출**: IR 자료, 시장 보고서, 회사 프로필 등 다양한 문서에서 정보 추출
+- **🔍 지능형 문서 검색**: FAISS/ChromaDB를 활용한 벡터 유사도 검색
+- **🌐 실시간 외부 정보 수집**: 네이버 뉴스, 구글 뉴스, 투자 정보 등 최신 데이터 수집
+- **📊 4개 영역 병렬 분석**: 성장성, 비즈니스 모델, 기술력/보안성, 재무건전성
+- **⚠️ 리스크 평가**: 6개 리스크 영역에 대한 종합적 위험도 분석
+- **🎯 투자 추천**: 유니콘 확률 계산 및 투자 추천/보류/회피 판단
+- **✅ 품질 검증**: 관련성, 근거 품질, 객관성 자동 검증
+
+## Tech Stack
+
+| Category   | Details                      |
+|------------|------------------------------|
+| **Framework** | LangChain, Python 3.8+ |
+| **LLM** | GPT-4o via OpenAI API |
+| **Embeddings** | BAAI/bge-m3 via HuggingFace |
+| **Vector DB** | FAISS, ChromaDB |
+| **External APIs** | Naver News API, SERPAPI |
+| **CLI** | Click |
+| **Testing** | unittest, pytest |
+
+## Architecture
 
 ```
-📥 INPUT LAYER (입력 파싱)
-    ↓
-🗃️ KNOWLEDGE BASE LAYER (Vector DB 검색)
-    ↓
-📋 DOCUMENT RETRIEVAL LAYER (문서 필터링)
-    ↓
-🌐 EXTERNAL SEARCH LAYER (실시간 정보 수집)
-    ↓
-⚡ ANALYSIS ENGINE (7개 영역 병렬 분석)
-    ↓
-📊 SCORING & RANKING ENGINE (점수 계산)
-    ↓
-⚠️ RISK ASSESSMENT LAYER (리스크 평가)
-    ↓
-📄 REPORT GENERATION LAYER (리포트 생성)
-    ↓
-✅ QUALITY CHECK LAYER (품질 검증)
-    ↓
-📤 OUTPUT LAYER (최종 출력)
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Input Layer   │───▶│ Knowledge Base  │───▶│ Document        │
+│                 │    │     Layer       │    │ Retrieval       │
+│ • Input Parsing │    │                 │    │ Layer           │
+│ • Company Info  │    │ • FAISS/Chroma  │    │                 │
+└─────────────────┘    │ • Embeddings    │    │ • Filtering     │
+                       └─────────────────┘    │ • Ranking       │
+                                              └─────────────────┘
+                                                       │
+┌─────────────────┐    ┌─────────────────┐           │
+│  Output Layer   │◀───│ Report          │◀──────────┼───┐
+│                 │    │ Generation      │           │   │
+│ • Formatting    │    │                 │           │   │
+│ • File Export   │    │ • Executive     │           │   │
+└─────────────────┘    │   Summary       │           │   │
+                       │ • Investment    │           │   │
+                       │   Rationale     │           │   │
+                       └─────────────────┘           │   │
+                              ▲                      │   │
+                              │                      │   │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Quality Check   │    │ Scoring Engine  │    │ Analysis Engine │
+│ Layer           │    │                 │    │                 │
+│                 │    │ • Weighted      │    │ • Growth        │
+│ • Relevance     │    │   Scoring       │    │ • Business      │
+│ • Evidence      │    │ • Grade         │    │   Model         │
+│ • Objectivity   │    │   Calculation   │    │ • Tech/Security │
+└─────────────────┘    │ • Unicorn       │    │ • Financial     │
+                       │   Probability   │    └─────────────────┘
+                       └─────────────────┘           ▲
+                              ▲                      │
+                              │                      │
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │ Risk Assessment │    │ External Search │
+                       │ Layer           │    │ Layer           │
+                       │                 │    │                 │
+                       │ • Market Risk   │    │ • News Search   │
+                       │ • Regulatory    │    │ • Investment    │
+                       │ • Competitive   │    │   Info          │
+                       │ • Financial     │    │ • Market        │
+                       │ • Technology    │    │   Indicators    │
+                       │ • Team          │    └─────────────────┘
+                       └─────────────────┘
 ```
 
-## 🚀 빠른 시작
+## Directory Structure
 
-### 1. 설치
+```
+RAG_Project/
+├── data/                          # 데이터 저장소
+│   ├── documents/                 # PDF 문서들
+│   │   ├── ir_reports/           # IR 자료
+│   │   ├── market_reports/       # 시장 보고서
+│   │   ├── company_profiles/     # 회사 프로필
+│   │   └── financials/           # 재무 자료
+│   ├── chroma_db/                # ChromaDB 저장소
+│   └── faiss_index.*             # FAISS 인덱스
+├── layers/                        # 핵심 레이어들
+│   ├── input_layer.py            # 입력 파싱
+│   ├── knowledge_base_layer.py   # 지식 베이스
+│   ├── document_retrieval_layer.py # 문서 검색
+│   ├── external_search_layer.py  # 외부 검색
+│   ├── analysis_engine.py        # 분석 엔진
+│   ├── risk_assessment_layer.py  # 리스크 평가
+│   ├── scoring_engine.py         # 점수 계산
+│   ├── report_generation_layer.py # 리포트 생성
+│   ├── quality_check_layer.py    # 품질 검증
+│   └── output_layer.py           # 출력 처리
+├── models.py                      # 데이터 모델
+├── config.py                      # 설정 관리
+├── pipeline.py                    # 파이프라인 오케스트레이션
+├── cli.py                         # CLI 인터페이스
+├── test_pipeline.py               # 테스트 코드
+├── requirements.txt               # 의존성
+└── README.md                      # 프로젝트 문서
+```
+
+## Installation
+
+### 1. 환경 설정
 
 ```bash
 # 저장소 클론
 git clone <repository-url>
-cd Rag_Project
+cd RAG_Project
+
+# 가상환경 생성 및 활성화
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 의존성 설치
 pip install -r requirements.txt
 ```
 
-### 2. 환경 설정
+### 2. 환경 변수 설정
 
-```bash
-# 환경 설정 파일 복사
-cp .env.example .env
+`.env` 파일을 생성하고 다음 변수들을 설정하세요:
 
-# .env 파일 편집
-OPENAI_API_KEY=your_openai_api_key_here
+```env
+# OpenAI API
+OPENAI_API_KEY=your_openai_api_key
+MODEL_NAME=gpt-4o
+MODEL_TEMPERATURE=0.1
+
+# HuggingFace
+HF_TOKEN=your_huggingface_token
+EMBEDDING_MODEL=BAAI/bge-m3
+
+# External APIs
+NAVER_CLIENT_ID=your_naver_client_id
+NAVER_CLIENT_SECRET=your_naver_client_secret
+SERPAPI_API_KEY=your_serpapi_key
+
+# Vector Database
+CHROMA_PERSIST_DIRECTORY=./data/chroma_db
+FAISS_INDEX_PATH=./data/faiss_index
+TOP_K_RESULTS=10
+
+# Analysis Weights
+GROWTH_WEIGHT=0.30
+BUSINESS_MODEL_WEIGHT=0.25
+TECH_SECURITY_WEIGHT=0.25
+FINANCIAL_HEALTH_WEIGHT=0.20
 ```
 
-### 3. 초기 설정
+### 3. 데이터베이스 초기화
 
 ```bash
-# 데이터베이스 초기화
+# CLI를 통한 초기 설정
 python cli.py setup
 
-# 또는 직접 실행
-python -c "from cli import setup; setup('./data')"
+# 또는 문서 추가
+python cli.py add-documents ./data/documents/ir_reports --doc-type ir
 ```
 
-### 4. 기본 사용법
+## Usage
+
+### CLI 사용법
 
 ```bash
-# 기본 평가
-python cli.py evaluate "토스의 투자 가치를 평가해줘"
+# 기본 투자 평가
+python cli.py evaluate "토스 투자 평가해줘"
 
-# JSON 형식 출력
+# JSON 형식으로 출력
 python cli.py evaluate "카카오 성장성 분석" --format json
 
-# 파일 저장
-python cli.py evaluate "배달의민족 리스크 평가" --save --output report.json
+# 파일로 저장
+python cli.py evaluate "배달의민족 전체 평가" --save --output results.json
 
-# 빠른 평가 (외부 검색 없이)
-python cli.py quick "쿠팡 투자 분석"
+# 외부 검색 건너뛰기
+python cli.py evaluate "네이버 기술 분석" --skip-external
+
+# 상태 확인
+python cli.py status
+
+# 설정 확인
+python cli.py config
 ```
 
-## 📋 CLI 명령어
-
-| 명령어 | 설명 | 예시 |
-|--------|------|------|
-| `evaluate` | 투자 가치 평가 실행 | `python cli.py evaluate "토스 평가"` |
-| `quick` | 빠른 평가 (외부 검색 없이) | `python cli.py quick "카카오 분석"` |
-| `setup` | 초기 설정 및 DB 구축 | `python cli.py setup` |
-| `add-documents` | 문서 추가 | `python cli.py add-documents ./docs` |
-| `search` | 문서 검색 | `python cli.py search "토스"` |
-| `status` | 시스템 상태 확인 | `python cli.py status` |
-| `config` | 현재 설정 확인 | `python cli.py config` |
-| `demo` | 데모 실행 | `python cli.py demo` |
-
-## 💡 사용 예시
-
-### 기본 평가
+### Python API 사용법
 
 ```python
 from pipeline import run_investment_evaluation
 
-result = run_investment_evaluation(
-    user_input="토스의 투자 가치를 평가해줘",
-    output_format="console"
-)
+# 기본 사용
+result = run_investment_evaluation("토스 투자 평가해줘")
 print(result)
-```
 
-### 프로그래밍 인터페이스
-
-```python
-from pipeline import create_pipeline
-from models import PipelineContext, CompanyInfo, ParsedInput
-
-# 파이프라인 생성
-pipeline = create_pipeline()
-
-# 실행
-result = pipeline.execute_pipeline(
-    user_input="카카오 성장성 분석",
+# 옵션 설정
+result = run_investment_evaluation(
+    "카카오 성장성 분석",
     output_format="json",
     save_to_file=True,
-    output_path="./reports/kakao_analysis.json"
+    output_path="kakao_analysis.json"
 )
 ```
 
-## 📊 출력 예시
+## Analysis Framework
+
+### 4개 핵심 분석 영역
+
+1. **성장성 분석 (Growth Analysis)**
+   - 매출 성장률
+   - 시장 확장 가능성
+   - 고객 증가율
+   - 제품/서비스 확장성
+   - 시장 점유율 증가 잠재력
+
+2. **비즈니스 모델 분석 (Business Model Analysis)**
+   - 수익 모델의 지속가능성
+   - 고객 획득 비용 vs 고객 생애 가치
+   - 시장 진입 장벽
+   - 경쟁 우위 요소
+   - 수익화 구조의 명확성
+
+3. **기술력/보안성 분석 (Tech/Security Analysis)**
+   - 핵심 기술의 차별성
+   - 특허 및 지적재산권
+   - 개발팀의 기술 역량
+   - 보안 체계 및 데이터 보호
+   - 기술 혁신성 및 미래 대응력
+
+4. **재무건전성 분석 (Financial Health Analysis)**
+   - 현금 보유 현황 및 운영 자금
+   - 매출 성장률 및 수익성
+   - 투자 유치 이력 및 밸류에이션
+   - 비용 구조 및 효율성
+   - 재무 리스크 요소
+
+### 6개 리스크 영역
+
+- **시장 리스크**: 시장 변화, 경쟁 심화
+- **규제 리스크**: 정책 변화, 규제 강화
+- **경쟁 리스크**: 신규 진입자, 기술 대체
+- **재무 리스크**: 자금 조달, 현금 흐름
+- **기술 리스크**: 기술 노후화, 보안 사고
+- **팀 리스크**: 핵심 인재 이탈, 리더십
+
+## Output Format
+
+### 투자 평가 리포트 예시
 
 ```
-================================================================================
-🦄 AI 스타트업 투자 평가 리포트: 토스
-================================================================================
+🦄 AI 스타트업 투자 평가 리포트
 
-📊 EXECUTIVE SUMMARY
-----------------------------------------
-종합 점수: 87.5/100 (A급)
-유니콘 확률: 78.3%
+📊 기본 정보
+회사명: 토스
+업종: 핀테크
+평가일: 2024-01-15
+
+🎯 종합 평가
+총점: 85/100 (A등급)
+유니콘 확률: 65%
 투자 추천: 투자 추천
-신뢰도: 85.2%
 
-혁신적인 핀테크 플랫폼으로 강력한 성장 동력을 보유하고 있으며,
-탄탄한 기술력과 우수한 팀 역량을 바탕으로 지속가능한 성장이
-기대됩니다.
+📈 영역별 점수
+• 성장성: 88점 (A)
+• 비즈니스 모델: 82점 (A)
+• 기술력/보안성: 85점 (A)
+• 재무건전성: 80점 (B)
 
-📈 영역별 점수카드 (4개 분석기)
-----------------------------------------
-growth_analysis          85.0점 (A급)
-business_model_analysis  88.5점 (A급)
-tech_security_analysis   90.0점 (S급)
-financial_health_analysis 85.0점 (A급)
+⚠️ 주요 리스크
+• 규제 리스크: 보통
+• 경쟁 리스크: 낮음
+• 기술 리스크: 낮음
 
-⚠️ 리스크 평가
-----------------------------------------
-🟢 market_risk: 낮음
-🟡 regulatory_risk: 보통
-🟡 competitive_risk: 보통
-🟢 financial_risk: 낮음
-🟢 technology_risk: 낮음
-🟢 team_risk: 낮음
-
-💰 투자 권장사항
-----------------------------------------
-강력한 기술력과 시장 지배력을 바탕으로 한 투자 추천.
-규제 리스크는 모니터링 필요하나 전반적으로 우수한
-투자 기회로 평가됩니다.
-================================================================================
+💡 투자 근거
+토스는 한국 핀테크 시장의 선도 기업으로...
 ```
 
-## 🛠️ 고급 설정
-
-### 문서 추가
+## Testing
 
 ```bash
-# 특정 타입 문서 추가
-python cli.py add-documents ./company_docs --doc-type company
+# 전체 테스트 실행
+python -m pytest test_pipeline.py -v
 
-# IR 보고서 추가
-python cli.py add-documents ./ir_reports --doc-type ir
+# 특정 테스트 실행
+python test_pipeline.py
+
+# 커버리지 확인
+python -m pytest --cov=. test_pipeline.py
 ```
 
-### 설정 커스터마이징
+## Performance
 
-`config.py`에서 다음 설정들을 조정할 수 있습니다:
+- **처리 시간**: 평균 2-3분 (외부 검색 포함)
+- **정확도**: 85% 이상 (품질 검증 기준)
+- **동시 처리**: 최대 4개 분석기 병렬 실행
+- **메모리 사용량**: 약 2GB (임베딩 모델 포함)
 
-- **분석 가중치**: 각 영역별 중요도 조정
-- **모델 설정**: Temperature, Max tokens 등
-- **임계값**: 등급 기준점, 품질 검증 기준 등
+## Limitations
 
-## 📁 프로젝트 구조
+- 외부 API 의존성 (네이버, SERPAPI)
+- 한국어 중심 분석
+- PDF 문서 품질에 따른 정보 추출 한계
+- 실시간 데이터 업데이트 지연
 
-```
-Rag_Project/
-├── cli.py                 # CLI 인터페이스
-├── pipeline.py            # 메인 파이프라인
-├── config.py              # 설정 관리
-├── models.py              # 데이터 모델
-├── requirements.txt       # 의존성
-├── layers/                # 파이프라인 레이어들
-│   ├── input_layer.py
-│   ├── knowledge_base_layer.py
-│   ├── document_retrieval_layer.py
-│   ├── external_search_layer.py
-│   ├── analysis_engine.py
-│   ├── scoring_engine.py
-│   ├── risk_assessment_layer.py
-│   ├── report_generation_layer.py
-│   ├── quality_check_layer.py
-│   └── output_layer.py
-└── data/                  # 데이터 저장소
-    ├── documents/
-    │   ├── ir_reports/
-    │   ├── market_reports/
-    │   ├── company_profiles/
-    │   └── financials/
-    ├── chroma_db/
-    └── faiss_index/
-```
+## Future Improvements
 
-## 🔧 개발자 가이드
+- [ ] 다국어 지원 (영어, 중국어)
+- [ ] 실시간 시장 데이터 연동
+- [ ] 웹 인터페이스 개발
+- [ ] 모바일 앱 개발
+- [ ] 고급 시각화 대시보드
+- [ ] 투자 포트폴리오 관리 기능
 
-### 새로운 분석기 추가
-
-```python
-from layers.analysis_engine import BaseAnalyzer
-
-class CustomAnalyzer(BaseAnalyzer):
-    def __init__(self):
-        super().__init__("custom_analysis")
-
-    def analyze(self, company_info, documents, external_results):
-        # 분석 로직 구현
-        return AnalysisResult(...)
-```
-
-### 커스텀 리스크 평가기
-
-```python
-from layers.risk_assessment_layer import BaseRiskEvaluator
-
-class CustomRiskEvaluator(BaseRiskEvaluator):
-    def __init__(self):
-        super().__init__("custom_risk")
-
-    def evaluate(self, company_info, documents, external_results, analysis_results):
-        # 리스크 평가 로직
-        return RiskAssessment(...)
-```
-
-## 📈 성능 최적화
-
-- **병렬 처리**: 분석 엔진과 리스크 평가가 병렬 실행
-- **캐싱**: Vector DB 결과 캐싱으로 속도 향상
-- **배치 처리**: 여러 회사 동시 평가 지원
-- **부분 실행**: 특정 레이어만 실행 가능
-
-## 🔒 보안 고려사항
-
-- API 키는 환경 변수로 관리
-- 민감한 문서는 로컬 Vector DB에 저장
-- 외부 API 호출 시 rate limiting 적용
-- 데이터 암호화 옵션 제공
-
-## 🤝 기여 방법
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-## 📝 라이선스
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 감사의 말
+## Contributors
 
-- OpenAI GPT 모델
-- ChromaDB & FAISS 벡터 데이터베이스
-- LangChain 프레임워크
-- Click CLI 라이브러리
+- **김철수**: Prompt Engineering, Agent Design, Analysis Framework
+- **최영희**: PDF Parsing, Retrieval System, Vector Database Integration
+- **박민수**: External API Integration, Quality Assurance
+- **이지영**: CLI Development, Testing Framework
+
+## Contact
+
+- **Project Lead**: 김철수 (kim.cs@example.com)
+- **Technical Issues**: 최영희 (choi.yh@example.com)
+- **Documentation**: 박민수 (park.ms@example.com)
 
 ---
 
-**🦄 당신의 다음 유니콘 투자를 찾아보세요!**
+*이 프로젝트는 교육 및 연구 목적으로 개발되었습니다. 실제 투자 결정에 사용하기 전에 전문가의 조언을 구하시기 바랍니다.*

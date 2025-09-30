@@ -17,6 +17,8 @@ import numpy as np
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import faiss   # 파일 제일 위에 넣기
+import pickle  # 같이 상단으로 올려두기
 
 from models import DocumentChunk, PipelineContext
 from config import get_config
@@ -90,7 +92,7 @@ class VectorDBManager:
 
             self.chroma_db = Chroma(
                 persist_directory=persist_directory,
-                embedding_function=chroma_embedding_function,
+                embedding_function=self.embeddings,  # 클래스 객체를 직접 넘김
                 collection_name=self.config["vector_db"].collection_name
             )
             logger.info("ChromaDB 초기화 완료")
