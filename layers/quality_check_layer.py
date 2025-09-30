@@ -3,8 +3,8 @@ Layer 9: QUALITY CHECK LAYER
 relevance_checker를 실행하여 답변의 관련성, 근거 충분성, 객관성을 검증하는 레이어
 """
 from typing import List, Dict, Any, Optional
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
 
 import re
 from datetime import datetime

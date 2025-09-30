@@ -5,8 +5,8 @@ Layer 5: ANALYSIS ENGINE
 import asyncio
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.prompts import PromptTemplate
 
 from models import AnalysisResult, DocumentChunk, ExternalSearchResult, PipelineContext, CompanyInfo
 from config import get_config
