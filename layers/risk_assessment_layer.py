@@ -4,7 +4,7 @@ risk_evaluator를 실행하여 시장, 규제, 경쟁, 재무 리스크를 평�
 """
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 
 from models import (
@@ -19,7 +19,7 @@ class BaseRiskEvaluator:
     def __init__(self, risk_category: str):
         self.risk_category = risk_category
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
             model_name="gpt-3.5-turbo-instruct"

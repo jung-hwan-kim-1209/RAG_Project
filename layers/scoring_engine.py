@@ -4,7 +4,7 @@ unicorn_score_calculator를 실행하여 총점, 등급, 유니콘 확률을 계
 """
 import math
 from typing import List, Dict, Any, Optional
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 
 from models import AnalysisResult, UnicornScore, PipelineContext, CompanyInfo
@@ -17,7 +17,7 @@ class UnicornScoreCalculator:
         self.config = get_config()
         self.analysis_weights = self.config["analysis_weights"]
         self.scoring_config = self.config["scoring"]
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
             model_name="gpt-3.5-turbo-instruct"

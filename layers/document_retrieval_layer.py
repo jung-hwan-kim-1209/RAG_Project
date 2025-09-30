@@ -4,7 +4,7 @@ company_document_retriever 실행하여 관련 문서 청크를 추출하는 레
 """
 import re
 from typing import List, Dict, Any, Optional
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 
 from models import DocumentChunk, PipelineContext, EvaluationType
@@ -15,7 +15,7 @@ class CompanyDocumentRetriever:
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
             model_name="gpt-3.5-turbo-instruct"

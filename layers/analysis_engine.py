@@ -5,7 +5,7 @@ Layer 5: ANALYSIS ENGINE
 import asyncio
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 
 from models import AnalysisResult, DocumentChunk, ExternalSearchResult, PipelineContext, CompanyInfo
@@ -17,7 +17,7 @@ class BaseAnalyzer:
     def __init__(self, analyzer_name: str):
         self.analyzer_name = analyzer_name
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=self.config["model"].temperature,
             model_name=self.config["model"].model_name

@@ -4,17 +4,18 @@ Layer 1: INPUT LAYER
 """
 import re
 from typing import List, Optional
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from models import ParsedInput, EvaluationType, CompanyInfo, PipelineContext
 from config import get_config
+
 
 class InputParser:
     """사용자 입력을 파싱하여 기업명과 평가 유형을 추출"""
 
     def __init__(self):
         self.config = get_config()
-        self.llm = OpenAI(
+        self.llm = ChatOpenAI(
             openai_api_key=self.config["model"].openai_api_key,
             temperature=0.1,
             model_name="gpt-3.5-turbo-instruct"
