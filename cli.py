@@ -15,7 +15,7 @@ load_dotenv()
 @click.group()
 @click.version_option("1.0.0")
 def cli():
-    """🦄 AI 스타트업 투자 평가 에이전트"""
+    """ AI 스타트업 투자 평가 에이전트"""
     pass
 
 @cli.command()
@@ -25,16 +25,18 @@ def cli():
               help='출력 형식')
 @click.option('--save', '-s', is_flag=True, help='파일로 저장')
 @click.option('--output', '-o', help='출력 파일 경로')
+@click.option('--pdf', '-p', help='PDF 보고서 저장 경로')
 @click.option('--skip-external', is_flag=True, help='외부 검색 건너뛰기')
 @click.option('--retries', default=1, help='최대 재시도 횟수')
 @click.option('--verbose', '-v', is_flag=True, help='상세 로그 출력')
-def evaluate(company_query, format, save, output, skip_external, retries, verbose):
+def evaluate(company_query, format, save, output, pdf, skip_external, retries, verbose):
     """스타트업 투자 가치 평가
 
     예시:
         투자평가 "토스의 투자 가치를 평가해줘"
         투자평가 "카카오 성장성 분석" --format json
         투자평가 "배달의민족 리스크 분석" --save --output report.json
+        투자평가 "토스의 투자 가치를 평가해줘" --pdf report.pdf
     """
 
     # 로깅 레벨 설정
@@ -54,7 +56,7 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
         return
 
     try:
-        click.echo(f"🚀 {company_query} 투자 평가를 시작합니다...")
+        click.echo(f"[시작] {company_query} 투자 평가를 시작합니다...")
 
         # 파이프라인 실행
         result = run_investment_evaluation(
@@ -62,6 +64,7 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
             output_format=format,
             save_to_file=save,
             output_path=output,
+            pdf_output_path=pdf,
             skip_external_search=skip_external,
             max_retries=retries
         )
@@ -69,7 +72,10 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
         click.echo(result)
 
         if save and output:
-            click.echo(f"💾 리포트가 {output}에 저장되었습니다.")
+            click.echo(f" 리포트가 {output}에 저장되었습니다.")
+
+        if pdf:
+            click.echo(f" PDF 보고서가 {pdf}에 저장되었습니다.")
 
     except Exception as e:
         click.echo(f"[오류] 오류 발생: {str(e)}", err=True)
@@ -82,7 +88,7 @@ def evaluate(company_query, format, save, output, skip_external, retries, verbos
 def setup(data_dir):
     """초기 설정 및 데이터베이스 구축"""
 
-    click.echo("🔧 AI 투자 평가 에이전트 초기 설정을 시작합니다...")
+    click.echo(" AI 투자 평가 에이전트 초기 설정을 시작합니다...")
 
     try:
         # 데이터 디렉토리 생성
@@ -108,7 +114,7 @@ def setup(data_dir):
         knowledge_base.setup_database()
 
         click.echo("[완료] 초기 설정 완료!")
-        click.echo(f"📋 데이터 디렉토리: {data_path.absolute()}")
+        click.echo(f" 데이터 디렉토리: {data_path.absolute()}")
         click.echo("[정보] 문서들을 해당 디렉토리에 추가한 후 사용하세요.")
 
     except Exception as e:
@@ -122,7 +128,7 @@ def setup(data_dir):
 def add_documents(documents_path, doc_type):
     """문서를 Vector Database에 추가"""
 
-    click.echo(f"📚 문서 추가 중: {documents_path}")
+    click.echo(f"[문서추가] 문서 추가 중: {documents_path}")
 
     try:
         knowledge_base = create_knowledge_base_layer()
@@ -168,7 +174,7 @@ def quick(company_query):
     """빠른 평가 (외부 검색 없이)"""
 
     try:
-        click.echo(f"⚡ {company_query} 빠른 평가 중...")
+        click.echo(f" {company_query} 빠른 평가 중...")
 
         result = run_investment_evaluation(
             user_input=company_query,
@@ -256,7 +262,7 @@ def demo():
         "배달의민족 리스크 평가"
     ]
 
-    click.echo("🎯 데모 실행 - 샘플 쿼리들:")
+    click.echo(" 데모 실행 - 샘플 쿼리들:")
 
     for i, query in enumerate(demo_queries, 1):
         click.echo(f"\n{i}. {query}")

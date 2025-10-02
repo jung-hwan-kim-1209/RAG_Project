@@ -44,11 +44,11 @@ class ScoringConfig:
     def __post_init__(self):
         if self.grade_thresholds is None:
             self.grade_thresholds = {
-                "S": int(os.getenv("GRADE_S_THRESHOLD", "90")),  # Exceptional
-                "A": int(os.getenv("GRADE_A_THRESHOLD", "80")),  # Strong
-                "B": int(os.getenv("GRADE_B_THRESHOLD", "70")),  # Good
-                "C": int(os.getenv("GRADE_C_THRESHOLD", "60")),  # Average
-                "D": 0    # Poor
+                "S": int(os.getenv("GRADE_S_THRESHOLD", "80")),  # Exceptional (상위 5%)
+                "A": int(os.getenv("GRADE_A_THRESHOLD", "65")),  # Strong (상위 20%)
+                "B": int(os.getenv("GRADE_B_THRESHOLD", "50")),  # Good (상위 40%)
+                "C": int(os.getenv("GRADE_C_THRESHOLD", "35")),  # Average (상위 60%)
+                "D": 0    # Below Average
             }
 
         if self.unicorn_probability_weights is None:

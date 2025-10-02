@@ -76,7 +76,7 @@ JSON 형식으로 응답해주세요:
             ))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 QUALITY_CHECK_LAYER - GPT 응답:")
+            print(f"\n[검색] QUALITY_CHECK_LAYER - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
@@ -255,7 +255,7 @@ JSON 형식으로 응답해주세요:
             ))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 QUALITY_CHECK_LAYER (OBJECTIVITY) - GPT 응답:")
+            print(f"\n[검색] QUALITY_CHECK_LAYER (OBJECTIVITY) - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)

@@ -17,6 +17,8 @@ import numpy as np
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import faiss   # 파일 제일 위에 넣기
+import pickle  # 같이 상단으로 올려두기
 
 from models import DocumentChunk, PipelineContext
 from config import get_config
@@ -90,7 +92,7 @@ class VectorDBManager:
 
             self.chroma_db = Chroma(
                 persist_directory=persist_directory,
-                embedding_function=chroma_embedding_function,
+                embedding_function=self.embeddings,  # 클래스 객체를 직접 넘김
                 collection_name=self.config["vector_db"].collection_name
             )
             logger.info("ChromaDB 초기화 완료")
@@ -162,8 +164,11 @@ class VectorDBManager:
 
         result = []
         for doc in split_docs:
+            # 유니코드 특수 문자 제거 (이모지 및 Private Use Area 문자)
+            clean_content = self._clean_unicode(doc.page_content)
+
             result.append({
-                "content": doc.page_content,
+                "content": clean_content,
                 "metadata": {
                     **doc.metadata,
                     "source": file_path,
@@ -172,6 +177,30 @@ class VectorDBManager:
             })
 
         return result
+
+    def _clean_unicode(self, text: str) -> str:
+        """유니코드 특수 문자 제거"""
+        import re
+
+        # 이모지만 제거 (Private Use Area 제외 - 한글 보존)
+        emoji_pattern = re.compile("["
+            u"\U0001F600-\U0001F64F"  # emoticons
+            u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+            u"\U0001F680-\U0001F6FF"  # transport & map symbols
+            u"\U0001F1E0-\U0001F1FF"  # flags
+            u"\U00002700-\U000027BF"  # Dingbats
+            u"\U0001F900-\U0001F9FF"  # Supplemental Symbols
+            u"\U0001FA70-\U0001FAFF"  # Extended-A
+            u"\U00002600-\U000026FF"  # Miscellaneous Symbols
+            u"\U0001F700-\U0001F77F"  # Alchemical Symbols
+            "]+", flags=re.UNICODE)
+
+        # Private Use Area에서 특정 bullet point 문자만 제거
+        text = emoji_pattern.sub('', text)
+        text = text.replace('\uf0b7', '')  # bullet point
+        text = text.replace('\uf0a7', '')  # square bullet
+
+        return text
 
     def add_documents_to_chroma(self, documents: List[Dict[str, Any]]) -> None:
         """ChromaDB에 문서 추가"""
@@ -276,8 +305,8 @@ class VectorDBManager:
             # 대안으로 FAISS 검색 사용
             return self.search_faiss(query, k)
 
-    def search_faiss(self, query: str, k: int = None) -> List[DocumentChunk]:
-        """FAISS에서 검색"""
+    def search_faiss(self, query: str, k: int = None, company_name: str = "") -> List[DocumentChunk]:
+        """FAISS에서 검색 (회사명 필터링 지원)"""
         if not self.faiss_db:
             return []
 
@@ -287,24 +316,68 @@ class VectorDBManager:
             # 쿼리 임베딩 생성
             query_embedding = self.embeddings.embed_query(query)
             query_array = np.array([query_embedding]).astype('float32')
-            
+
             # 정규화
             import faiss
             faiss.normalize_L2(query_array)
-            
-            # 검색 실행
-            scores, indices = self.faiss_db["index"].search(query_array, k)
-            
+
+            # 검색 실행 (더 많이 가져온 후 필터링)
+            search_k = k * 3 if company_name else k
+            scores, indices = self.faiss_db["index"].search(query_array, search_k)
+
             chunks = []
             for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
                 if idx >= 0 and idx < len(self.faiss_db["texts"]):
+                    metadata = self.faiss_db["metadatas"][idx]
+
+                    # 회사명 필터링 (메타데이터 또는 소스 경로에서 확인)
+                    if company_name:
+                        source = metadata.get("source", "")
+                        content = self.faiss_db["texts"][idx]
+
+                        # 1) 메타데이터에 회사명 필드가 있는 경우
+                        if "company" in metadata and metadata["company"] != company_name:
+                            continue
+
+                        # 2) 회사명 매칭 맵 (한글 <-> 영문)
+                        company_mapping = {
+                            "핀다": ["finda", "핀다"],
+                            "finda": ["finda", "핀다"],
+                            "8퍼센트": ["8percent", "8퍼센트"],
+                            "8percent": ["8percent", "8퍼센트"],
+                            "뱅크샐러드": ["banksalad", "뱅크샐러드"],
+                            "banksalad": ["banksalad", "뱅크샐러드"],
+                            "하이카": ["hicar", "hicarcompany", "하이카", "하이카컴퍼니"],
+                            "하이카컴퍼니": ["hicar", "hicarcompany", "하이카", "하이카컴퍼니"],
+                            "hicar": ["hicar", "hicarcompany", "하이카", "하이카컴퍼니"],
+                            "hicarcompany": ["hicar", "hicarcompany", "하이카", "하이카컴퍼니"]
+                        }
+
+                        # 3) 매칭할 회사명들 생성
+                        search_names = [company_name.lower()]
+                        for key, values in company_mapping.items():
+                            if company_name in values or company_name.lower() in [v.lower() for v in values]:
+                                search_names.extend([v.lower() for v in values])
+                                break
+
+                        # 4) 파일 경로나 내용에 관련 회사명이 있는지 확인
+                        source_lower = source.lower()
+                        content_lower = content[:500].lower()  # 처음 500자만 확인
+
+                        if not any(name in source_lower or name in content_lower for name in search_names):
+                            continue
+
                     chunk = DocumentChunk(
                         content=self.faiss_db["texts"][idx],
-                        source=self.faiss_db["metadatas"][idx].get("source", "unknown"),
-                        metadata=self.faiss_db["metadatas"][idx],
+                        source=metadata.get("source", "unknown"),
+                        metadata=metadata,
                         similarity_score=float(score)
                     )
                     chunks.append(chunk)
+
+                    # 필요한 개수만큼 모았으면 종료
+                    if len(chunks) >= k:
+                        break
 
             return chunks
         except Exception as e:
@@ -358,33 +431,50 @@ class KnowledgeBase:
         company_name: str = "",
         use_chroma: bool = True,
         use_faiss: bool = True,
-        k: int = None
+        k: int = None,
+        similarity_threshold: float = 0.0
     ) -> List[DocumentChunk]:
         """지식 베이스에서 관련 문서 검색"""
 
         all_chunks = []
 
-        # ChromaDB 검색
+        # ChromaDB 검색 (필터 없이 일단 검색)
         if use_chroma:
-            filter_dict = {}
-            if company_name:
-                filter_dict["company"] = company_name
+            try:
+                chroma_chunks = self.vector_db_manager.search_chroma(
+                    query=query,
+                    k=k,
+                    filter_dict=None  # 필터 제거
+                )
+                all_chunks.extend(chroma_chunks)
+                logger.info(f"ChromaDB에서 {len(chroma_chunks)}개 문서 검색")
+            except Exception as e:
+                logger.error(f"ChromaDB 검색 오류: {e}")
 
-            chroma_chunks = self.vector_db_manager.search_chroma(
-                query=query,
-                k=k,
-                filter_dict=filter_dict if filter_dict else None
-            )
-            all_chunks.extend(chroma_chunks)
-
-        # FAISS 검색
+        # FAISS 검색 (회사명 필터링 적용)
         if use_faiss:
-            faiss_chunks = self.vector_db_manager.search_faiss(query=query, k=k)
-            all_chunks.extend(faiss_chunks)
+            try:
+                faiss_chunks = self.vector_db_manager.search_faiss(
+                    query=query,
+                    k=k,
+                    company_name=company_name
+                )
+                all_chunks.extend(faiss_chunks)
+                logger.info(f"FAISS에서 {len(faiss_chunks)}개 문서 검색")
+            except Exception as e:
+                logger.error(f"FAISS 검색 오류: {e}")
 
-        # 중복 제거 및 정렬
+        # 중복 제거
         unique_chunks = self._deduplicate_chunks(all_chunks)
-        sorted_chunks = sorted(unique_chunks, key=lambda x: x.similarity_score, reverse=True)
+
+        # 유사도 threshold 필터링
+        filtered_chunks = [
+            chunk for chunk in unique_chunks
+            if chunk.similarity_score >= similarity_threshold
+        ]
+
+        # 정렬
+        sorted_chunks = sorted(filtered_chunks, key=lambda x: x.similarity_score, reverse=True)
 
         # 상위 k개 반환
         final_k = k or self.vector_db_manager.config["vector_db"].top_k_results
@@ -421,13 +511,29 @@ def process_knowledge_base_layer(context: PipelineContext) -> PipelineContext:
 
     search_query = f"{company_name} {evaluation_type} 투자 평가 분석"
 
+    print(f"[검색] 내부 문서 검색 중: '{company_name}' 관련 문서...")
+
     # 지식 베이스에서 관련 문서 검색
     retrieved_chunks = knowledge_base.search_knowledge_base(
         query=search_query,
-        company_name=company_name
+        company_name=company_name,
+        similarity_threshold=0.0  # 모든 결과 포함
     )
 
     context.retrieved_documents = retrieved_chunks
+
+    # CLI 출력: 참고한 내부 문서 목록
+    print("\n" + "="*80)
+    print(f"[문서] 참고한 내부 문서 ({len(retrieved_chunks)}개)")
+    print("="*80)
+    for i, chunk in enumerate(retrieved_chunks[:10], 1):  # 상위 10개만 출력
+        print(f"\n[{i}] 출처: {chunk.source}")
+        print(f"    유사도: {chunk.similarity_score:.3f}")
+        preview = chunk.content[:150].replace('\n', ' ')
+        print(f"    내용: {preview}...")
+    if len(retrieved_chunks) > 10:
+        print(f"\n... 외 {len(retrieved_chunks) - 10}개 더 참고")
+    print("="*80 + "\n")
 
     # 처리 단계 기록
     context.processing_steps.append(
@@ -438,28 +544,28 @@ def process_knowledge_base_layer(context: PipelineContext) -> PipelineContext:
 
 # 테스트 코드
 if __name__ == "__main__":
-    print("🧪 Knowledge Base Layer 테스트 시작...")
+    print("[테스트] Knowledge Base Layer 테스트 시작...")
     
     try:
         # VectorDBManager 테스트
         print("1. VectorDBManager 초기화 테스트...")
         manager = VectorDBManager()
-        print("✅ VectorDBManager 초기화 성공")
+        print("[완료] VectorDBManager 초기화 성공")
         
         # HuggingFace 임베딩 테스트
         print("2. HuggingFace 임베딩 테스트...")
         test_text = "테스트 문서입니다."
         embedding = manager.embeddings.embed_query(test_text)
-        print(f"✅ 임베딩 생성 성공: {len(embedding)}차원")
+        print(f"[완료] 임베딩 생성 성공: {len(embedding)}차원")
         
         # KnowledgeBase 테스트
         print("3. KnowledgeBase 초기화 테스트...")
         kb = KnowledgeBase()
-        print("✅ KnowledgeBase 초기화 성공")
+        print("[완료] KnowledgeBase 초기화 성공")
         
-        print("\n🎉 모든 테스트 통과!")
+        print("\n[완료] 모든 테스트 통과!")
         
     except Exception as e:
-        print(f"❌ 테스트 실패: {e}")
+        print(f"[오류] 테스트 실패: {e}")
         import traceback
         traceback.print_exc()

@@ -50,6 +50,7 @@ class InvestmentEvaluationPipeline:
         output_format: str = None,
         save_to_file: bool = False,
         output_path: str = None,
+        pdf_output_path: str = None,
         skip_external_search: bool = False,
         max_retries: int = None
     ) -> str:
@@ -144,7 +145,8 @@ class InvestmentEvaluationPipeline:
             context=context,
             output_format=output_format,
             save_to_file=save_to_file,
-            output_path=output_path
+            output_path=output_path,
+            pdf_output_path=pdf_output_path
         )
 
         logger.info("파이프라인 실행 완료")

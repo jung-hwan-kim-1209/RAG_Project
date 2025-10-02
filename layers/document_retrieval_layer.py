@@ -216,7 +216,7 @@ class CompanyDocumentRetriever:
             ))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 DOCUMENT_RETRIEVAL_LAYER - GPT 응답:")
+            print(f"\n[검색] DOCUMENT_RETRIEVAL_LAYER - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)

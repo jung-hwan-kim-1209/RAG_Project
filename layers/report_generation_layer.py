@@ -94,22 +94,42 @@ Executive Summary는 다음 구조로 작성해주세요:
         unicorn_score: UnicornScore,
         risk_assessments: List[RiskAssessment]
     ) -> InvestmentRecommendation:
-        """투자 추천 결정"""
+        """투자 추천 결정 (개선된 로직)"""
 
         total_score = unicorn_score.total_score
         unicorn_probability = unicorn_score.unicorn_probability
+        balance_score = unicorn_score.score_breakdown.get('balance_score', 100)
 
-        # 높은 리스크 체크
+        # 리스크 평가
         high_risk_count = sum(1 for risk in risk_assessments
                              if risk.risk_level.value in ["높음", "매우 높음"])
+        critical_risk_count = sum(1 for risk in risk_assessments
+                                 if risk.risk_level.value == "매우 높음")
 
-        # 투자 결정 로직
-        if total_score >= 85 and unicorn_probability >= 0.7 and high_risk_count <= 1:
+        # 균형도 체크 (어느 한 영역이라도 40점 미만이면 경고)
+        balance_warning = balance_score < 40
+
+        # 투자 결정 로직 (개선)
+        # S급: 매우 강력한 투자 추천
+        if (total_score >= 90 and unicorn_probability >= 0.8 and
+            high_risk_count == 0 and not balance_warning):
             return InvestmentRecommendation.INVEST
-        elif total_score >= 70 and unicorn_probability >= 0.5 and high_risk_count <= 2:
+
+        # A급: 강력한 투자 추천
+        elif (total_score >= 80 and unicorn_probability >= 0.65 and
+              critical_risk_count == 0 and not balance_warning):
             return InvestmentRecommendation.INVEST
-        elif total_score >= 60 and high_risk_count <= 3:
+
+        # B급: 조건부 투자 추천
+        elif (total_score >= 70 and unicorn_probability >= 0.5 and
+              high_risk_count <= 2 and balance_score >= 45):
+            return InvestmentRecommendation.INVEST
+
+        # C급: 관망 (Hold)
+        elif (total_score >= 60 and high_risk_count <= 3 and balance_score >= 40):
             return InvestmentRecommendation.HOLD
+
+        # D급 or 높은 리스크: 회피
         else:
             return InvestmentRecommendation.AVOID
 
@@ -130,7 +150,7 @@ Executive Summary는 다음 구조로 작성해주세요:
             ))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 REPORT_GENERATION_LAYER (EXECUTIVE_SUMMARY) - GPT 응답:")
+            print(f"\n[검색] REPORT_GENERATION_LAYER (EXECUTIVE_SUMMARY) - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
@@ -173,7 +193,7 @@ Executive Summary는 다음 구조로 작성해주세요:
             ))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 REPORT_GENERATION_LAYER (DETAILED_ANALYSIS) - GPT 응답:")
+            print(f"\n[검색] REPORT_GENERATION_LAYER (DETAILED_ANALYSIS) - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
@@ -201,7 +221,7 @@ Executive Summary는 다음 구조로 작성해주세요:
             ))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 REPORT_GENERATION_LAYER (INVESTMENT_RATIONALE) - GPT 응답:")
+            print(f"\n[검색] REPORT_GENERATION_LAYER (INVESTMENT_RATIONALE) - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)
@@ -225,7 +245,7 @@ Executive Summary는 다음 구조로 작성해주세요:
         low_risks = [r for r in risk_assessments if r.risk_level == RiskLevel.LOW]
 
         if critical_risks:
-            risk_summary.append("### 🔴 매우 높은 리스크")
+            risk_summary.append("###  매우 높은 리스크")
             for risk in critical_risks:
                 risk_summary.append(f"- **{risk.category}**: {risk.description}")
 
@@ -253,28 +273,46 @@ Executive Summary는 다음 구조로 작성해주세요:
         documents: List[DocumentChunk],
         external_results: List[ExternalSearchResult]
     ) -> float:
-        """신뢰도 레벨 계산"""
+        """신뢰도 레벨 계산 (개선)"""
         confidence_factors = []
 
-        # 데이터 양 기반 신뢰도
+        # 1. 데이터 양 기반 신뢰도
         max_data_sources = int(os.getenv("MAX_DATA_SOURCES_FOR_CONFIDENCE", "20"))
-        data_confidence = min(len(documents) + len(external_results), max_data_sources) / max_data_sources
-        confidence_factors.append(data_confidence)
+        total_data = len(documents) + len(external_results)
+        data_confidence = min(total_data, max_data_sources) / max_data_sources
+        confidence_factors.append(("data_volume", data_confidence, 0.25))
 
-        # 분석 완성도 기반 신뢰도
+        # 2. 분석 완성도 기반 신뢰도
         max_analysis_areas = int(os.getenv("MAX_ANALYSIS_AREAS", "4"))
         analysis_confidence = len(analysis_results) / max_analysis_areas
-        confidence_factors.append(analysis_confidence)
+        confidence_factors.append(("analysis_completeness", analysis_confidence, 0.30))
 
-        # 리스크 평가 완성도
+        # 3. 리스크 평가 완성도
         max_risk_categories = int(os.getenv("MAX_RISK_CATEGORIES", "6"))
         risk_confidence = len(risk_assessments) / max_risk_categories
-        confidence_factors.append(risk_confidence)
+        confidence_factors.append(("risk_assessment", risk_confidence, 0.20))
 
-        # 평균 신뢰도 계산
-        overall_confidence = sum(confidence_factors) / len(confidence_factors)
+        # 4. 분석 품질 (평균 점수 분산도)
+        if analysis_results:
+            scores = [r.score for r in analysis_results]
+            avg_score = sum(scores) / len(scores)
+            # 점수가 너무 고르면(분산이 낮으면) 신뢰도 향상
+            variance = sum((s - avg_score) ** 2 for s in scores) / len(scores)
+            quality_confidence = max(0, 1 - (variance / 1000))  # 분산이 낮을수록 높은 신뢰도
+            confidence_factors.append(("analysis_quality", quality_confidence, 0.15))
 
-        return min(overall_confidence, 1.0)
+        # 5. 데이터 다양성 (내부+외부 데이터 균형)
+        if total_data > 0:
+            internal_ratio = len(documents) / total_data
+            diversity_confidence = 1 - abs(0.5 - internal_ratio)  # 50:50에 가까울수록 높은 신뢰도
+            confidence_factors.append(("data_diversity", diversity_confidence, 0.10))
+
+        # 가중 평균 신뢰도 계산
+        weighted_sum = sum(conf * weight for _, conf, weight in confidence_factors)
+        total_weight = sum(weight for _, _, weight in confidence_factors)
+        overall_confidence = weighted_sum / total_weight if total_weight > 0 else 0.5
+
+        return min(max(overall_confidence, 0.0), 1.0)
 
     def generate_investment_report(
         self,
@@ -356,17 +394,281 @@ class ReportFormatter:
     def __init__(self):
         pass
 
+    def format_pdf_report(self, report: InvestmentReport, output_path: str) -> bool:
+        """PDF 형식 리포트 생성"""
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import A4, letter
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+            from reportlab.platypus import Image as RLImage
+            from reportlab.pdfbase import pdfmetrics
+            from reportlab.pdfbase.ttfonts import TTFont
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+            import os
+
+            # 한글 폰트 설정 (Windows)
+            try:
+                font_path = "C:\\Windows\\Fonts\\malgun.ttf"  # 맑은 고딕
+                if os.path.exists(font_path):
+                    pdfmetrics.registerFont(TTFont('Malgun', font_path))
+                    font_name = 'Malgun'
+                else:
+                    font_name = 'Helvetica'  # 폴백 폰트
+            except:
+                font_name = 'Helvetica'
+
+            # PDF 문서 생성
+            doc = SimpleDocTemplate(output_path, pagesize=A4,
+                                   rightMargin=72, leftMargin=72,
+                                   topMargin=72, bottomMargin=18)
+
+            # 스타일 설정
+            styles = getSampleStyleSheet()
+
+            # 커스텀 스타일 정의
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontName=font_name,
+                fontSize=24,
+                textColor=colors.HexColor('#1a237e'),
+                spaceAfter=30,
+                alignment=TA_CENTER
+            )
+
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontName=font_name,
+                fontSize=16,
+                textColor=colors.HexColor('#283593'),
+                spaceAfter=12,
+                spaceBefore=12
+            )
+
+            normal_style = ParagraphStyle(
+                'CustomNormal',
+                parent=styles['Normal'],
+                fontName=font_name,
+                fontSize=10,
+                leading=14
+            )
+
+            # 문서 구성 요소들
+            story = []
+
+            # 제목
+            story.append(Paragraph(f" AI 스타트업 투자 평가 리포트", title_style))
+            story.append(Paragraph(f"{report.company_info.name}", title_style))
+            story.append(Spacer(1, 20))
+
+            # Executive Summary
+            story.append(Paragraph("[분석] EXECUTIVE SUMMARY", heading_style))
+
+            # 요약 정보 테이블
+            balance_info = report.unicorn_score.score_breakdown.get('balance_score', 'N/A')
+            balance_text = f"{balance_info:.1f}점" if isinstance(balance_info, (int, float)) else str(balance_info)
+
+            summary_data = [
+                ['항목', '값'],
+                ['종합 점수', f"{report.unicorn_score.total_score:.1f}/100 ({report.unicorn_score.grade}급)"],
+                ['유니콘 확률', f"{report.unicorn_score.unicorn_probability:.1%}"],
+                ['투자 추천', report.recommendation.value],
+                ['신뢰도', f"{report.confidence_level:.1%}"],
+                ['균형도 (최저점수)', balance_text],
+                ['평가 일시', report.evaluation_date.strftime('%Y-%m-%d %H:%M:%S')]
+            ]
+
+            summary_table = Table(summary_data, colWidths=[2.5*inch, 3.5*inch])
+            summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(summary_table)
+            story.append(Spacer(1, 20))
+
+            # Executive Summary 내용
+            summary_text = report.executive_summary.replace('\n', '<br/>')
+            story.append(Paragraph(summary_text, normal_style))
+            story.append(Spacer(1, 20))
+
+            # 영역별 점수카드
+            story.append(Paragraph("[성장] 영역별 점수카드", heading_style))
+
+            score_data = [['영역', '점수', '등급']]
+            for result in report.analysis_results:
+                score_data.append([
+                    result.category,
+                    f"{result.score:.1f}점",
+                    result.grade
+                ])
+
+            score_table = Table(score_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+            score_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(score_table)
+            story.append(Spacer(1, 20))
+
+            # 시각화: 점수 바 차트
+            try:
+                from reportlab.graphics.shapes import Drawing
+                from reportlab.graphics.charts.barcharts import VerticalBarChart
+                from reportlab.graphics.charts.legends import Legend
+
+                drawing = Drawing(400, 200)
+                bc = VerticalBarChart()
+                bc.x = 50
+                bc.y = 50
+                bc.height = 125
+                bc.width = 300
+                bc.data = [[result.score for result in report.analysis_results]]
+                bc.strokeColor = colors.black
+                bc.valueAxis.valueMin = 0
+                bc.valueAxis.valueMax = 100
+                bc.valueAxis.valueStep = 20
+                bc.categoryAxis.labels.boxAnchor = 'ne'
+                bc.categoryAxis.labels.dx = 8
+                bc.categoryAxis.labels.dy = -2
+                bc.categoryAxis.labels.angle = 30
+                bc.categoryAxis.categoryNames = [r.category[:15] for r in report.analysis_results]
+
+                # 바 색상 설정
+                bc.bars[0].fillColor = colors.HexColor('#4285F4')
+
+                drawing.add(bc)
+                story.append(drawing)
+                story.append(Spacer(1, 20))
+            except Exception as e:
+                print(f"바 차트 생성 실패: {e}")
+
+            # 시각화: 레이더 차트 (종합 평가)
+            try:
+                from reportlab.graphics.charts.spider import SpiderChart
+
+                drawing2 = Drawing(400, 200)
+                sp = SpiderChart()
+                sp.x = 120
+                sp.y = 20
+                sp.width = 180
+                sp.height = 180
+                sp.data = [[result.score for result in report.analysis_results]]
+                sp.labels = [r.category[:10] + '...' if len(r.category) > 10 else r.category
+                            for r in report.analysis_results]
+                sp.strands[0].fillColor = colors.HexColor('#4285F4')
+                sp.strands[0].strokeColor = colors.HexColor('#1a237e')
+                sp.strands[0].strokeWidth = 2
+
+                drawing2.add(sp)
+                story.append(drawing2)
+                story.append(Spacer(1, 20))
+            except Exception as e:
+                print(f"레이더 차트 생성 실패: {e}")
+
+            # 리스크 평가
+            story.append(Paragraph("[경고] 리스크 평가", heading_style))
+
+            risk_data = [['카테고리', '리스크 레벨', '설명']]
+            for risk in report.risk_assessments:
+                risk_emoji = {
+                    "낮음": "[낮음]",
+                    "보통": "[보통]",
+                    "높음": "[높음]",
+                    "매우 높음": "[매우높음]"
+                }
+                emoji = risk_emoji.get(risk.risk_level.value, "")
+                risk_data.append([
+                    risk.category,
+                    f"{emoji} {risk.risk_level.value}",
+                    risk.description[:100] + "..." if len(risk.description) > 100 else risk.description
+                ])
+
+            risk_table = Table(risk_data, colWidths=[2*inch, 1.5*inch, 2.5*inch])
+            risk_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightgoldenrodyellow),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            story.append(risk_table)
+            story.append(Spacer(1, 20))
+
+            # 페이지 나누기
+            story.append(PageBreak())
+
+            # 상세 분석
+            story.append(Paragraph(" 상세 분석", heading_style))
+            detailed_text = report.detailed_analysis.replace('\n', '<br/>')
+            story.append(Paragraph(detailed_text, normal_style))
+            story.append(Spacer(1, 20))
+
+            # 투자 권장사항
+            story.append(Paragraph("[재무] 투자 권장사항", heading_style))
+            rationale_text = report.investment_rationale.replace('\n', '<br/>')
+            story.append(Paragraph(rationale_text, normal_style))
+            story.append(Spacer(1, 20))
+
+            # 메타데이터
+            story.append(Paragraph(" 평가 정보", heading_style))
+            meta_data = [
+                ['데이터 소스', f"{len(report.data_sources)}개"],
+                ['제한사항', ', '.join(report.limitations) if report.limitations else '없음']
+            ]
+            meta_table = Table(meta_data, colWidths=[2*inch, 4*inch])
+            meta_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.lightgrey),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            story.append(meta_table)
+
+            # PDF 생성
+            doc.build(story)
+            return True
+
+        except Exception as e:
+            print(f"PDF 생성 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     def format_console_report(self, report: InvestmentReport) -> str:
         """콘솔용 리포트 포맷팅"""
         lines = []
 
         # 헤더
         lines.append("=" * 80)
-        lines.append(f"🦄 AI 스타트업 투자 평가 리포트: {report.company_info.name}")
+        lines.append(f" AI 스타트업 투자 평가 리포트: {report.company_info.name}")
         lines.append("=" * 80)
 
         # Executive Summary
-        lines.append("\n📊 EXECUTIVE SUMMARY")
+        lines.append("\n[분석] EXECUTIVE SUMMARY")
         lines.append("-" * 40)
         lines.append(f"종합 점수: {report.unicorn_score.total_score:.1f}/100 ({report.unicorn_score.grade}급)")
         lines.append(f"유니콘 확률: {report.unicorn_score.unicorn_probability:.1%}")
@@ -376,31 +678,31 @@ class ReportFormatter:
         lines.append(report.executive_summary)
 
         # 영역별 점수
-        lines.append("\n📈 영역별 점수카드")
+        lines.append("\n[성장] 영역별 점수카드")
         lines.append("-" * 40)
         for result in report.analysis_results:
             lines.append(f"{result.category:20} {result.score:5.1f}점 ({result.grade}급)")
 
         # 리스크 평가
-        lines.append("\n⚠️ 리스크 평가")
+        lines.append("\n[경고] 리스크 평가")
         lines.append("-" * 40)
         for risk in report.risk_assessments:
             risk_emoji = {
-                "낮음": "🟢",
-                "보통": "🟡",
-                "높음": "🟠",
-                "매우 높음": "🔴"
+                "낮음": "[낮음]",
+                "보통": "[보통]",
+                "높음": "[높음]",
+                "매우 높음": "[매우높음]"
             }
-            emoji = risk_emoji.get(risk.risk_level.value, "⚪")
+            emoji = risk_emoji.get(risk.risk_level.value, "")
             lines.append(f"{emoji} {risk.category}: {risk.risk_level.value}")
 
         # 투자 권장사항
-        lines.append(f"\n💰 투자 권장사항")
+        lines.append(f"\n[재무] 투자 권장사항")
         lines.append("-" * 40)
         lines.append(report.investment_rationale)
 
         # 메타데이터
-        lines.append(f"\n📋 평가 정보")
+        lines.append(f"\n 평가 정보")
         lines.append("-" * 40)
         lines.append(f"평가 일시: {report.evaluation_date.strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append(f"데이터 소스: {len(report.data_sources)}개")

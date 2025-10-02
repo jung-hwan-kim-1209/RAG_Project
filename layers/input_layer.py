@@ -55,7 +55,7 @@ class InputParser:
             response = self.llm.invoke(self.parsing_prompt.format(user_input=user_input))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 INPUT_LAYER - GPT 응답:")
+            print(f"\n[검색] INPUT_LAYER - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)

@@ -122,7 +122,7 @@ JSON 형식으로 응답해주세요:
             ))
 
             # GPT 응답을 터미널에 출력
-            print(f"\n🔍 SCORING_ENGINE - GPT 응답:")
+            print(f"\n[검색] SCORING_ENGINE - GPT 응답:")
             print("=" * 60)
             print(response.content)
             print("=" * 60)

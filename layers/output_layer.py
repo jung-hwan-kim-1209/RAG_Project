@@ -24,15 +24,15 @@ class OutputProcessor:
     def format_console_output(self, context: PipelineContext) -> str:
         """콘솔 출력 포맷팅"""
         if not context.final_report:
-            return "❌ 투자 평가 리포트 생성 실패"
+            return "[오류] 투자 평가 리포트 생성 실패"
 
         # 품질 검증 상태 확인
         quality_status = ""
         if context.quality_check:
             if context.quality_check.passed:
-                quality_status = "✅ 품질 검증 통과"
+                quality_status = "[완료] 품질 검증 통과"
             else:
-                quality_status = f"⚠️ 품질 검증 실패 (이슈: {len(context.quality_check.issues)}개)"
+                quality_status = f"[경고] 품질 검증 실패 (이슈: {len(context.quality_check.issues)}개)"
 
         # 기본 리포트 포맷팅
         formatted_report = self.formatter.format_console_report(context.final_report)
@@ -43,7 +43,7 @@ class OutputProcessor:
 
         # 처리 과정 요약 추가
         if context.processing_steps:
-            formatted_report += "\n🔄 처리 과정:\n"
+            formatted_report += "\n[처리] 처리 과정:\n"
             for i, step in enumerate(context.processing_steps, 1):
                 formatted_report += f"{i}. {step}\n"
 
@@ -72,6 +72,9 @@ class OutputProcessor:
 
             elif format_type == "csv":
                 self._save_as_csv(report, output_file)
+
+            elif format_type == "pdf":
+                return self.formatter.format_pdf_report(report, str(output_file))
 
             return True
 
@@ -132,7 +135,8 @@ class OutputLayer:
         context: PipelineContext,
         output_format: str = "console",
         save_to_file: bool = False,
-        output_path: str = None
+        output_path: str = None,
+        pdf_output_path: str = None
     ) -> str:
         """최종 출력 처리"""
 
@@ -147,6 +151,16 @@ class OutputLayer:
                 self.output_processor.save_report_to_file(
                     context.final_report, output_path, "json"
                 )
+
+            # PDF 저장 옵션
+            if pdf_output_path and context.final_report:
+                success = self.output_processor.save_report_to_file(
+                    context.final_report, pdf_output_path, "pdf"
+                )
+                if success:
+                    output += f"\n\n[완료] PDF 보고서 생성 완료: {pdf_output_path}\n"
+                else:
+                    output += f"\n\n[오류] PDF 보고서 생성 실패\n"
 
             return output
 
@@ -170,20 +184,20 @@ class OutputLayer:
     def print_processing_summary(self, context: PipelineContext) -> None:
         """처리 과정 요약 출력"""
         print("\n" + "="*60)
-        print("🔄 파이프라인 실행 요약")
+        print("[처리] 파이프라인 실행 요약")
         print("="*60)
 
         if context.execution_start_time and context.execution_end_time:
             duration = context.execution_end_time - context.execution_start_time
-            print(f"⏱️ 총 실행 시간: {duration.total_seconds():.1f}초")
+            print(f"[시간] 총 실행 시간: {duration.total_seconds():.1f}초")
 
-        print(f"📊 처리된 단계: {len(context.processing_steps)}개")
+        print(f"[분석] 처리된 단계: {len(context.processing_steps)}개")
 
         for i, step in enumerate(context.processing_steps, 1):
             print(f"{i:2d}. {step}")
 
         if context.quality_check:
-            print(f"\n✨ 최종 품질 점수: {context.quality_check.overall_quality:.1%}")
+            print(f"\n 최종 품질 점수: {context.quality_check.overall_quality:.1%}")
 
         print("="*60)
 
@@ -195,7 +209,8 @@ def process_output_layer(
     context: PipelineContext,
     output_format: str = "console",
     save_to_file: bool = False,
-    output_path: str = None
+    output_path: str = None,
+    pdf_output_path: str = None
 ) -> str:
     """Output Layer 처리 함수"""
     output_layer = create_output_layer()
@@ -205,7 +220,8 @@ def process_output_layer(
         context=context,
         output_format=output_format,
         save_to_file=save_to_file,
-        output_path=output_path
+        output_path=output_path,
+        pdf_output_path=pdf_output_path
     )
 
     # 처리 과정 요약 (콘솔 모드에서만)
